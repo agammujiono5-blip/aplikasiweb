@@ -38,17 +38,6 @@ export default function App() {
     setScreen(nextScreen);
   };
 
-  // Helper to resolve route for unauthenticated visitors
-  const getUnauthScreen = (pathname: string): { screen: Screen; targetPath: string } => {
-    if (pathname === '/admin/login') {
-      return { screen: 'admin-login', targetPath: '/admin/login' };
-    }
-    if (pathname === '/register') {
-      return { screen: 'register', targetPath: '/register' };
-    }
-    return { screen: 'login', targetPath: '/login' };
-  };
-
   const applyResolvedAuth = (targetScreen: Screen, targetRole: Role) => {
     authResolvedRef.current = { screen: targetScreen, role: targetRole };
     if (loadingScreenDoneRef.current) {
@@ -57,19 +46,37 @@ export default function App() {
     }
   };
 
-  // Session validation using Sanctum backend tokens
+  // Route & Session validation on mount
   useEffect(() => {
     const validateSession = async () => {
       const initialPath = window.location.pathname;
+
+      // 1. Explicit login or register routes always render their respective pages
+      if (initialPath === '/login' || initialPath === '/' || initialPath === '') {
+        if (initialPath !== '/login') {
+          window.history.replaceState({}, '', '/login');
+        }
+        applyResolvedAuth('login', 'penyewa');
+        return;
+      }
+
+      if (initialPath === '/admin/login') {
+        applyResolvedAuth('admin-login', 'admin');
+        return;
+      }
+
+      if (initialPath === '/register') {
+        applyResolvedAuth('register', 'penyewa');
+        return;
+      }
+
+      // 2. For dashboard routes (/dashboard, /admin/dashboard), check token
       const token = localStorage.getItem('auth_token');
       const storedRole = localStorage.getItem('user_role');
 
       if (!token) {
-        const { screen: unauthScreen, targetPath } = getUnauthScreen(initialPath);
-        if (initialPath !== targetPath) {
-          window.history.replaceState({}, '', targetPath);
-        }
-        applyResolvedAuth(unauthScreen, 'penyewa');
+        window.history.replaceState({}, '', '/login');
+        applyResolvedAuth('login', 'penyewa');
         return;
       }
 
@@ -88,9 +95,6 @@ export default function App() {
             const data = await adminRes.json();
             if (data.user) {
               localStorage.setItem('user_data', JSON.stringify(data.user));
-            }
-            if (initialPath === '/admin/login' || initialPath === '/login' || initialPath === '/register') {
-              window.history.replaceState({}, '', '/');
             }
             applyResolvedAuth('app', 'admin');
             return;
@@ -112,9 +116,7 @@ export default function App() {
               if (data.user) {
                 localStorage.setItem('user_data', JSON.stringify(data.user));
               }
-              if (initialPath === '/admin/login' || initialPath === '/login' || initialPath === '/register') {
-                window.history.replaceState({}, '', '/');
-              }
+              window.history.replaceState({}, '', '/dashboard');
               applyResolvedAuth('app', 'penyewa');
               return;
             }
@@ -147,9 +149,6 @@ export default function App() {
           if (data.user) {
             localStorage.setItem('user_data', JSON.stringify(data.user));
           }
-          if (initialPath === '/login' || initialPath === '/admin/login' || initialPath === '/register') {
-            window.history.replaceState({}, '', '/');
-          }
           applyResolvedAuth('app', 'penyewa');
           return;
         }
@@ -170,9 +169,7 @@ export default function App() {
             if (data.user) {
               localStorage.setItem('user_data', JSON.stringify(data.user));
             }
-            if (initialPath === '/login' || initialPath === '/admin/login' || initialPath === '/register') {
-              window.history.replaceState({}, '', '/');
-            }
+            window.history.replaceState({}, '', '/admin/dashboard');
             applyResolvedAuth('app', 'admin');
             return;
           }
@@ -211,15 +208,17 @@ export default function App() {
         setScreen('admin-login');
       } else if (path === '/register') {
         setScreen('register');
-      } else if (path === '/login') {
+      } else if (path === '/login' || path === '/') {
         setScreen('login');
-      } else {
+      } else if (path === '/dashboard' || path === '/admin/dashboard') {
         if (token && storedRole) {
           setRole(storedRole);
           setScreen('app');
         } else {
           setScreen('login');
         }
+      } else {
+        setScreen('login');
       }
     };
 
@@ -230,7 +229,8 @@ export default function App() {
   const handleLogin = (r: Role) => {
     setRole(r);
     setActivePage('beranda');
-    navigateTo('/', 'app');
+    const targetPath = r === 'admin' ? '/admin/dashboard' : '/dashboard';
+    navigateTo(targetPath, 'app');
   };
 
   const handleLogout = async () => {
