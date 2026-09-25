@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Plus Jakarta Sans:Italic';
+  src: url('https://static.figma.com/font/PlusJakartaSans-Italic_wght__2') format('woff2');
+  font-style: italic;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans:Regular';
+  src: url('https://static.figma.com/font/PlusJakartaSans_wght__2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+}
+
+@theme inline {
+  --color-primary: #4b3f9e;
+  --color-primary-dark: #342586;
+}
+
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
