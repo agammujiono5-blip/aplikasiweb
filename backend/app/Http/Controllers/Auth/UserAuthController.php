@@ -35,7 +35,9 @@ class UserAuthController extends Controller
             'is_active' => true,
         ]);
 
-        $token = $user->createToken('user-token', ['user'])->plainTextToken;
+        $tokenInstance = $user->createToken('user-token', ['user']);
+        $token = $tokenInstance->plainTextToken;
+        \App\Models\PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $user);
 
         return response()->json([
             'status' => 'success',
@@ -80,12 +82,22 @@ class UserAuthController extends Controller
 
         // Check password against Argon2id/Bcrypt hash
         if (! $user || ! Hash::check($password, $user->password)) {
+            // Check if it's an admin credential trying to log in through the student portal
+            $adminExists = \App\Models\Admin::where('email', $credential)->orWhere('petugas_id', $credential)->first();
+            if ($adminExists && Hash::check($password, $adminExists->password)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Akun ini terdaftar sebagai Administrator / Petugas Sarpras. Silakan masuk melalui halaman login Admin.',
+                    'redirect' => '/admin/login',
+                ], 403);
+            }
+
             $this->rateLimiter->hit($credential, $request, 'user');
             $remaining = $this->rateLimiter->remaining($credential, $request, 'user');
 
             return response()->json([
                 'status' => 'error',
-                'message' => "NIM/Email atau kata sandi tidak sesuai. Sisa percobaan: {$remaining} kali.",
+                'message' => 'NIM/Email atau password salah.',
                 'remaining_attempts' => $remaining,
             ], 401);
         }
@@ -101,7 +113,9 @@ class UserAuthController extends Controller
         // Login successful: Clear rate limiter
         $this->rateLimiter->clear($credential, $request, 'user');
 
-        $token = $user->createToken('user-token', ['user'])->plainTextToken;
+        $tokenInstance = $user->createToken('user-token', ['user']);
+        $token = $tokenInstance->plainTextToken;
+        \App\Models\PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $user);
 
         return response()->json([
             'status' => 'success',
@@ -114,6 +128,13 @@ class UserAuthController extends Controller
                 'nim' => $user->nim,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'prodi' => $user->prodi,
+                'fakultas' => $user->fakultas,
+                'angkatan' => $user->angkatan,
+                'organisasi' => $user->organisasi,
+                'jabatan' => $user->jabatan,
+                'alamat' => $user->alamat,
+                'bio' => $user->bio,
             ],
         ]);
     }
@@ -123,15 +144,23 @@ class UserAuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
+        $u = $request->user();
         return response()->json([
             'status' => 'success',
             'role' => 'penyewa',
             'user' => [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'nim' => $request->user()->nim,
-                'email' => $request->user()->email,
-                'phone' => $request->user()->phone,
+                'id' => $u->id,
+                'name' => $u->name,
+                'nim' => $u->nim,
+                'email' => $u->email,
+                'phone' => $u->phone,
+                'prodi' => $u->prodi,
+                'fakultas' => $u->fakultas,
+                'angkatan' => $u->angkatan,
+                'organisasi' => $u->organisasi,
+                'jabatan' => $u->jabatan,
+                'alamat' => $u->alamat,
+                'bio' => $u->bio,
             ],
         ]);
     }

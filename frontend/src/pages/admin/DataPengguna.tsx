@@ -1,48 +1,46 @@
 import { useState } from 'react';
-
-interface User {
-  id: string;
-  nama: string;
-  nim: string;
-  email: string;
-  prodi: string;
-  angkatan: string;
-  status: 'aktif' | 'nonaktif';
-  pengajuan: number;
-  disetujui: number;
-}
-
-const initialUsers: User[] = [
-  { id: 'u1', nama: 'Rizky Dharma Pratama', nim: '2021001234', email: 'rizky.dharma@mhs.nusantara.ac.id', prodi: 'Teknik Informatika', angkatan: '2021', status: 'aktif', pengajuan: 5, disetujui: 2 },
-  { id: 'u2', nama: 'Siti Nurhaliza', nim: '2020005678', email: 'siti.nurhaliza@mhs.nusantara.ac.id', prodi: 'Teknik Elektro', angkatan: '2020', status: 'aktif', pengajuan: 3, disetujui: 3 },
-  { id: 'u3', nama: 'Ahmad Fauzi', nim: '2022009012', email: 'ahmad.fauzi@mhs.nusantara.ac.id', prodi: 'Manajemen', angkatan: '2022', status: 'aktif', pengajuan: 4, disetujui: 2 },
-  { id: 'u4', nama: 'Dewi Rahayu', nim: '2021003456', email: 'dewi.rahayu@mhs.nusantara.ac.id', prodi: 'Akuntansi', angkatan: '2021', status: 'aktif', pengajuan: 2, disetujui: 2 },
-  { id: 'u5', nama: 'Budi Santoso', nim: '2019007890', email: 'budi.santoso@mhs.nusantara.ac.id', prodi: 'Hukum', angkatan: '2019', status: 'nonaktif', pengajuan: 8, disetujui: 5 },
-  { id: 'u6', nama: 'Maya Putri', nim: '2022011234', email: 'maya.putri@mhs.nusantara.ac.id', prodi: 'Psikologi', angkatan: '2022', status: 'aktif', pengajuan: 1, disetujui: 1 },
-];
+import { api, useLiveQuery } from '../../api/client';
+import type { UserAdminItem } from '../../api/client';
 
 export default function DataPengguna() {
-  const [users, setUsers] = useState(initialUsers);
+  const { data: allUsers, loading, refetch } = useLiveQuery(() => api.users.getAdminList());
+  const users = Array.isArray(allUsers) ? allUsers : [];
+
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'semua' | 'aktif' | 'nonaktif'>('semua');
-  const [selected, setSelected] = useState<User | null>(null);
+  const [selected, setSelected] = useState<UserAdminItem | null>(null);
 
   const filtered = users.filter(u => {
-    const matchSearch = !search || u.nama.toLowerCase().includes(search.toLowerCase()) || u.nim.includes(search) || u.email.toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      !search ||
+      u.nama.toLowerCase().includes(search.toLowerCase()) ||
+      u.nim.includes(search) ||
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      u.prodi.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'semua' || u.status === filterStatus;
     return matchSearch && matchStatus;
   });
 
-  const toggleStatus = (userId: string) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: u.status === 'aktif' ? 'nonaktif' : 'aktif' } : u));
-    if (selected?.id === userId) setSelected(prev => prev ? { ...prev, status: prev.status === 'aktif' ? 'nonaktif' : 'aktif' } : null);
+  const toggleStatus = async (userId: string) => {
+    try {
+      await api.users.toggleStatus(userId);
+      await refetch();
+      if (selected?.id === userId) {
+        setSelected(prev => prev ? { ...prev, status: prev.status === 'aktif' ? 'nonaktif' : 'aktif' } : null);
+      }
+    } catch (err) {
+      alert('Gagal mengubah status pengguna: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   return (
-    <div className="px-6 lg:px-8 py-6 max-w-[1040px] flex flex-col gap-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="px-6 lg:px-10 py-6 w-full max-w-full flex flex-col gap-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[#111c2d] text-[28px] font-bold tracking-[-0.6px]">Data Pengguna</h1>
-        <p className="text-[#474552] text-[14px]">Kelola akun mahasiswa yang terdaftar dalam sistem peminjaman.</p>
+        <div className="flex items-center gap-2">
+          <h1 className="text-[#111c2d] text-[28px] font-bold tracking-[-0.6px]">Data Pengguna</h1>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mt-1" />
+        </div>
+        <p className="text-[#474552] text-[14px]">Kelola akun mahasiswa yang terdaftar dalam sistem peminjaman secara real-time.</p>
       </div>
 
       {/* Summary */}
@@ -59,28 +57,28 @@ export default function DataPengguna() {
         ))}
       </div>
 
-      {/* Filter */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1">
-          {(['semua', 'aktif', 'nonaktif'] as const).map(f => (
+      {/* Controls */}
+      <div className="bg-white border border-[rgba(201,196,212,0.5)] rounded-[12px] p-4 flex flex-wrap items-center justify-between gap-4 shadow-[0px_1px_3px_rgba(30,41,59,0.04)]">
+        <div className="flex items-center gap-1">
+          {(['semua', 'aktif', 'nonaktif'] as const).map(st => (
             <button
-              key={f}
-              onClick={() => setFilterStatus(f)}
-              className={`px-4 py-2 rounded-[8px] text-[13px] font-semibold transition-colors capitalize
-                ${filterStatus === f ? 'bg-[#4b3f9e] text-white' : 'bg-white border border-[rgba(201,196,212,0.7)] text-[#474552] hover:bg-[#f5f6fa]'}`}
+              key={st}
+              onClick={() => setFilterStatus(st)}
+              className={`px-4 py-2 rounded-[8px] text-[13px] font-semibold transition-colors capitalize cursor-pointer
+                ${filterStatus === st ? 'bg-[#ece9fe] text-[#4b3f9e]' : 'text-[#474552] hover:bg-[#f5f6fa]'}`}
             >
-              {f === 'semua' ? 'Semua' : f.charAt(0).toUpperCase() + f.slice(1)}
+              {st} ({st === 'semua' ? users.length : users.filter(u => u.status === st).length})
             </button>
           ))}
         </div>
-        <div className="relative flex-1 min-w-[200px] max-w-[320px]">
+        <div className="relative w-full sm:w-[260px]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#787583]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Cari nama, NIM, atau email..."
+            placeholder="Cari nama, NIM, email, prodi..."
             className="w-full h-[40px] bg-white border border-[rgba(201,196,212,0.7)] rounded-[8px] pl-9 pr-4 text-[13px] text-[#111c2d] placeholder-[#787583] outline-none focus:border-[#4b3f9e] focus:ring-2 focus:ring-[#4b3f9e]/10 transition-all"
           />
         </div>
@@ -88,123 +86,91 @@ export default function DataPengguna() {
 
       {/* Table */}
       <div className="bg-white border border-[rgba(201,196,212,0.5)] rounded-[12px] shadow-[0px_1px_3px_rgba(30,41,59,0.04)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-[rgba(201,196,212,0.3)] bg-[#f8f9fc]">
-                <th className="px-5 py-3 text-[11px] font-semibold text-[#787583] uppercase tracking-wide">Pengguna</th>
-                <th className="px-5 py-3 text-[11px] font-semibold text-[#787583] uppercase tracking-wide hidden sm:table-cell">Program Studi</th>
-                <th className="px-5 py-3 text-[11px] font-semibold text-[#787583] uppercase tracking-wide hidden lg:table-cell">Pengajuan</th>
-                <th className="px-5 py-3 text-[11px] font-semibold text-[#787583] uppercase tracking-wide">Status</th>
-                <th className="px-5 py-3 text-[11px] font-semibold text-[#787583] uppercase tracking-wide">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[rgba(201,196,212,0.2)]">
-              {filtered.map(user => (
-                <tr key={user.id} className="hover:bg-[#f8f9fc] transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#ece9fe] flex items-center justify-center text-[#4b3f9e] text-[12px] font-bold shrink-0">
-                        {user.nama.split(' ').map(n => n[0]).slice(0, 2).join('')}
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[#111c2d] text-[13px] font-semibold">{user.nama}</span>
-                        <span className="text-[#787583] text-[11px]">{user.nim} · Angkatan {user.angkatan}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 hidden sm:table-cell">
-                    <span className="text-[#474552] text-[13px]">{user.prodi}</span>
-                  </td>
-                  <td className="px-5 py-4 hidden lg:table-cell">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[#111c2d] text-[13px] font-medium">{user.pengajuan} total</span>
-                      <span className="text-[#065f46] text-[11px]">{user.disetujui} disetujui</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span
-                      className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                      style={{
-                        backgroundColor: user.status === 'aktif' ? '#d1fae5' : '#f0f1f5',
-                        color: user.status === 'aktif' ? '#065f46' : '#787583',
-                      }}
-                    >
-                      {user.status === 'aktif' ? 'Aktif' : 'Nonaktif'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setSelected(user)}
-                        className="text-[#4b3f9e] text-[12px] font-semibold hover:underline"
-                      >
-                        Detail
-                      </button>
-                      <span className="text-[#c9c4d4]">|</span>
-                      <button
-                        onClick={() => toggleStatus(user.id)}
-                        className={`text-[12px] font-semibold hover:underline ${user.status === 'aktif' ? 'text-[#991b1b]' : 'text-[#065f46]'}`}
-                      >
-                        {user.status === 'aktif' ? 'Nonaktifkan' : 'Aktifkan'}
-                      </button>
-                    </div>
-                  </td>
+        {loading && users.length === 0 ? (
+          <div className="p-12 text-center text-[#787583] text-[14px]">Memuat data pengguna dari database...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13px]">
+              <thead className="bg-[#f8f9fc] border-b border-[rgba(201,196,212,0.4)] text-[#787583] font-semibold text-[11px] uppercase tracking-[0.5px]">
+                <tr>
+                  <th className="px-5 py-3.5">Mahasiswa</th>
+                  <th className="px-5 py-3.5">NIM</th>
+                  <th className="px-5 py-3.5">Program Studi</th>
+                  <th className="px-5 py-3.5">Status Akun</th>
+                  <th className="px-5 py-3.5">Pengajuan</th>
+                  <th className="px-5 py-3.5 text-right">Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <div className="py-12 text-center text-[#787583] text-[13px]">Tidak ada pengguna yang cocok.</div>
-          )}
-        </div>
+              </thead>
+              <tbody className="divide-y divide-[rgba(201,196,212,0.3)] text-[#111c2d]">
+                {filtered.map(u => (
+                  <tr key={u.id} className="hover:bg-[#fcfcff] transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-[#111c2d]">{u.nama}</span>
+                        <span className="text-[#787583] text-[11px]">{u.email}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 font-mono text-[#474552] whitespace-nowrap">{u.nim}</td>
+                    <td className="px-5 py-4 text-[#474552] whitespace-nowrap">{u.prodi}</td>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => toggleStatus(u.id)}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity
+                          ${u.status === 'aktif' ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-[#fee2e2] text-[#991b1b]'}`}
+                        title="Klik untuk ubah status akun"
+                      >
+                        {u.status === 'aktif' ? 'Aktif' : 'Nonaktif'} ↻
+                      </button>
+                    </td>
+                    <td className="px-5 py-4 text-[#474552] whitespace-nowrap">
+                      <span className="font-semibold text-[#111c2d]">{u.pengajuan}</span> total · <span className="text-[#065f46] font-semibold">{u.disetujui}</span> disetujui
+                    </td>
+                    <td className="px-5 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setSelected(u)}
+                          className="text-[#4b3f9e] hover:underline text-[12px] font-semibold cursor-pointer"
+                        >
+                          Detail
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* User detail panel */}
+      {/* Modal Detail */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="flex-1 bg-black/30" onClick={() => setSelected(null)} />
-          <div className="w-full max-w-[400px] bg-white h-full overflow-y-auto flex flex-col shadow-xl">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[rgba(201,196,212,0.3)] sticky top-0 bg-white z-10">
-              <h3 className="text-[#111c2d] text-[16px] font-bold">Detail Pengguna</h3>
-              <button onClick={() => setSelected(null)} className="w-8 h-8 rounded-full bg-[#f5f6fa] flex items-center justify-center">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#474552" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <div className="px-6 py-6 flex flex-col gap-5">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-[#ece9fe] flex items-center justify-center text-[#4b3f9e] text-[22px] font-bold">
-                  {selected.nama.split(' ').map(n => n[0]).slice(0, 2).join('')}
-                </div>
-                <div>
-                  <h4 className="text-[#111c2d] text-[16px] font-bold">{selected.nama}</h4>
-                  <p className="text-[#787583] text-[13px]">{selected.nim}</p>
-                  <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${selected.status === 'aktif' ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-[#f0f1f5] text-[#787583]'}`}>
-                    {selected.status === 'aktif' ? 'Aktif' : 'Nonaktif'}
-                  </span>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[16px] max-w-[460px] w-full p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-[#111c2d] text-[18px] font-bold">{selected.nama}</h3>
+                <span className="text-[#787583] text-[12px] font-mono">{selected.nim}</span>
               </div>
-
-              {[
-                { label: 'Email', value: selected.email },
-                { label: 'Program Studi', value: selected.prodi },
-                { label: 'Angkatan', value: selected.angkatan },
-                { label: 'Total Pengajuan', value: `${selected.pengajuan} pengajuan` },
-                { label: 'Pengajuan Disetujui', value: `${selected.disetujui} disetujui` },
-              ].map(row => (
-                <div key={row.label} className="flex flex-col gap-1 border-b border-[rgba(201,196,212,0.2)] pb-3 last:border-0">
-                  <span className="text-[#787583] text-[11px] font-semibold uppercase tracking-wide">{row.label}</span>
-                  <span className="text-[#111c2d] text-[14px]">{row.value}</span>
-                </div>
-              ))}
-
+              <button onClick={() => setSelected(null)} className="text-[#787583] hover:text-[#111c2d] text-[20px] font-bold cursor-pointer">×</button>
+            </div>
+            <div className="flex flex-col gap-2.5 text-[13px] bg-[#f8f9fc] p-4 rounded-[10px] border border-[rgba(201,196,212,0.3)]">
+              <div><span className="text-[#787583]">Email:</span> <p className="font-semibold text-[#111c2d]">{selected.email}</p></div>
+              <div><span className="text-[#787583]">Program Studi:</span> <p className="font-semibold text-[#111c2d]">{selected.prodi}</p></div>
+              <div><span className="text-[#787583]">Fakultas:</span> <p className="font-semibold text-[#111c2d]">{selected.fakultas}</p></div>
+              <div><span className="text-[#787583]">Angkatan:</span> <p className="font-semibold text-[#111c2d]">{selected.angkatan}</p></div>
+              <div><span className="text-[#787583]">Status Akun:</span>
+                <span className={`inline-block ml-2 text-[11px] font-semibold px-2 py-0.5 rounded-full ${selected.status === 'aktif' ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-[#fee2e2] text-[#991b1b]'}`}>
+                  {selected.status === 'aktif' ? 'Aktif' : 'Nonaktif'}
+                </span>
+              </div>
+              <div><span className="text-[#787583]">Total Pengajuan:</span> <p className="font-semibold text-[#111c2d]">{selected.pengajuan} kali ({selected.disetujui} disetujui)</p></div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-[rgba(201,196,212,0.3)]">
+              <button onClick={() => setSelected(null)} className="px-4 py-2 border rounded-[8px] text-[13px] font-semibold text-[#474552] hover:bg-[#f5f6fa] cursor-pointer">Tutup</button>
               <button
                 onClick={() => toggleStatus(selected.id)}
-                className={`w-full py-3 rounded-[10px] text-[14px] font-semibold transition-colors ${
-                  selected.status === 'aktif'
-                    ? 'bg-[#fee2e2] text-[#991b1b] hover:bg-[#fecdd3]'
-                    : 'bg-[#d1fae5] text-[#065f46] hover:bg-[#a7f3d0]'
-                }`}
+                className={`px-4 py-2 rounded-[8px] text-[13px] font-semibold text-white cursor-pointer ${selected.status === 'aktif' ? 'bg-[#ba1a1a] hover:bg-[#931515]' : 'bg-[#065f46] hover:bg-[#044e39]'}`}
               >
                 {selected.status === 'aktif' ? 'Nonaktifkan Akun' : 'Aktifkan Akun'}
               </button>

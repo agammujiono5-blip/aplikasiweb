@@ -82,9 +82,10 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
 
       // Simpan token & data user ke localStorage
       if (data.token) {
+        localStorage.setItem('user_auth_token', data.token);
+        localStorage.setItem('user_data', JSON.stringify(data.user));
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('user_role', 'penyewa');
-        localStorage.setItem('user_data', JSON.stringify(data.user));
       }
 
       setSuccessMsg('Akun berhasil dibuat! Mengalihkan ke dashboard...');
@@ -217,7 +218,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               type="text"
-              placeholder="NIM *"
+              placeholder="NIM (Nomor Induk Mahasiswa - contoh: 21537144001) *"
               value={nim}
               onChange={e => setNim(e.target.value)}
               required

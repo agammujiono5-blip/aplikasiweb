@@ -4,9 +4,11 @@ import type { Role } from '../components/Layout';
 interface LoginPageProps {
   onLogin: (role: Role) => void;
   onNavigateRegister?: () => void;
+  onNavigateForgotPassword?: () => void;
+  onNavigateAdmin?: () => void;
 }
 
-export default function LoginPage({ onLogin, onNavigateRegister }: LoginPageProps) {
+export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgotPassword, onNavigateAdmin }: LoginPageProps) {
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,15 +39,16 @@ export default function LoginPage({ onLogin, onNavigateRegister }: LoginPageProp
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || 'NIM/Email atau kata sandi tidak sesuai.');
+        setError(data.message || 'NIM/Email atau password salah.');
         return;
       }
 
       // Save token and user info to localStorage
       if (data.token) {
+        localStorage.setItem('user_auth_token', data.token);
+        localStorage.setItem('user_data', JSON.stringify(data.user));
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('user_role', 'penyewa');
-        localStorage.setItem('user_data', JSON.stringify(data.user));
       }
 
       onLogin('penyewa');
@@ -130,13 +133,24 @@ export default function LoginPage({ onLogin, onNavigateRegister }: LoginPageProp
 
         {/* Error Alert */}
         {error && (
-          <div className="bg-red-500/25 border border-red-400/40 rounded-2xl px-4 py-3 text-red-100 text-[13px] backdrop-blur-md mb-6 flex items-start gap-2.5 shadow-sm">
-            <svg className="shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span className="block leading-snug">{error}</span>
+          <div className="bg-red-500/25 border border-red-400/40 rounded-2xl px-4 py-3 text-red-100 text-[13px] backdrop-blur-md mb-6 flex flex-col gap-2 shadow-sm">
+            <div className="flex items-start gap-2.5">
+              <svg className="shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span className="block leading-snug">{error}</span>
+            </div>
+            {error.includes('Administrator') && (
+              <button
+                type="button"
+                onClick={() => onNavigateAdmin ? onNavigateAdmin() : (window.location.pathname = '/admin/login')}
+                className="self-start text-[12px] font-bold text-amber-200 hover:text-amber-100 underline pl-6 cursor-pointer"
+              >
+                Klik di sini untuk langsung ke Halaman Login Admin &rarr;
+              </button>
+            )}
           </div>
         )}
 
@@ -216,10 +230,10 @@ export default function LoginPage({ onLogin, onNavigateRegister }: LoginPageProp
           {/* Sub Links Row: Forgot Password ? & Sign Up (Exact match with reference layout) */}
           <div className="flex items-center justify-between text-[13px] text-white/80 px-2 mt-2">
             <a
-              href="#"
+              href="/forgot-password"
               onClick={e => {
                 e.preventDefault();
-                setError('Untuk pemulihan kata sandi akun SiPinjam UNY, silakan hubungi admin atau ULT.');
+                if (onNavigateForgotPassword) onNavigateForgotPassword();
               }}
               className="hover:text-white transition-colors cursor-pointer"
             >
@@ -240,6 +254,18 @@ export default function LoginPage({ onLogin, onNavigateRegister }: LoginPageProp
             ) : (
               <span className="hover:text-white transition-colors cursor-pointer">Sign Up</span>
             )}
+          </div>
+
+          {/* Switch to Admin Login Portal */}
+          <div className="pt-3 mt-1 border-t border-white/15 flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => onNavigateAdmin ? onNavigateAdmin() : (window.location.pathname = '/admin/login')}
+              className="text-[12px] text-white/75 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer py-1 group"
+            >
+              <span>Petugas / Pengelola Sarpras?</span>
+              <span className="font-semibold text-amber-300 group-hover:text-amber-200 underline">Login Admin &rarr;</span>
+            </button>
           </div>
         </form>
       </div>

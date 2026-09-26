@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(\App\Http\Middleware\AddServerTiming::class);
         $middleware->alias([
             'auth.admin' => \App\Http\Middleware\EnsureAdmin::class,
             'auth.user' => \App\Http\Middleware\EnsureUser::class,

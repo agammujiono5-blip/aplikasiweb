@@ -45,12 +45,22 @@ class AdminAuthController extends Controller
 
         // Check password against Argon2id/Bcrypt hash
         if (! $admin || ! Hash::check($password, $admin->password)) {
+            // Check if it's a student trying to log in through admin portal
+            $userExists = \App\Models\User::where('email', $credential)->orWhere('nim', $credential)->first();
+            if ($userExists && Hash::check($password, $userExists->password)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Akun ini terdaftar sebagai Mahasiswa/Penyewa. Silakan masuk melalui halaman login Mahasiswa.',
+                    'redirect' => '/login',
+                ], 403);
+            }
+
             $this->rateLimiter->hit($credential, $request, 'admin');
             $remaining = $this->rateLimiter->remaining($credential, $request, 'admin');
 
             return response()->json([
                 'status' => 'error',
-                'message' => "ID Petugas/Email atau kata sandi admin salah. Sisa percobaan: {$remaining} kali.",
+                'message' => 'ID Petugas/Email atau password admin salah.',
                 'remaining_attempts' => $remaining,
             ], 401);
         }
@@ -66,7 +76,9 @@ class AdminAuthController extends Controller
         // Login successful: Clear rate limiter
         $this->rateLimiter->clear($credential, $request, 'admin');
 
-        $token = $admin->createToken('admin-token', ['admin'])->plainTextToken;
+        $tokenInstance = $admin->createToken('admin-token', ['admin']);
+        $token = $tokenInstance->plainTextToken;
+        \App\Models\PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $admin);
 
         return response()->json([
             'status' => 'success',
