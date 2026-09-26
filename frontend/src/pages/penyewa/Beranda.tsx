@@ -22,23 +22,30 @@ const statusStyle: Record<string, { bg: string; border: string; text: string; la
 };
 
 export default function Beranda({ onNavigate }: BerandaProps) {
-  // Live query for user stats and available rooms
+  // Live query for user stats, available rooms, and student profile
   const { data: combinedData } = useLiveQuery(async () => {
-    const [stats, rooms] = await Promise.all([
+    const [stats, rooms, profile] = await Promise.all([
       api.peminjaman.getUserStats(),
       api.rooms.getAll(),
+      api.users.getProfile().catch(() => null),
     ]);
-    return { stats, rooms };
+    return { stats, rooms, profile };
   });
 
   const stats = combinedData?.stats;
   const rooms = (combinedData?.rooms && combinedData.rooms.length > 0) ? combinedData.rooms : DEFAULT_ROOMS;
+  const liveProfile = combinedData?.profile;
 
   // Logged-in user information with reactive live sync
   const [currentUser, setCurrentUser] = useState<{ name?: string; nama?: string; nim?: string; email?: string } | null>(() => {
     try {
       const stored = localStorage.getItem('user_data');
-      return stored ? JSON.parse(stored) : null;
+      if (!stored) return null;
+      const parsed = JSON.parse(stored);
+      if (parsed?.petugas_id || parsed?.name?.toLowerCase().includes('petugas') || parsed?.email === 'admin@kampus.ac.id') {
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -48,7 +55,12 @@ export default function Beranda({ onNavigate }: BerandaProps) {
     const sync = () => {
       try {
         const stored = localStorage.getItem('user_data');
-        if (stored) setCurrentUser(JSON.parse(stored));
+        if (!stored) return;
+        const parsed = JSON.parse(stored);
+        if (parsed?.petugas_id || parsed?.name?.toLowerCase().includes('petugas') || parsed?.email === 'admin@kampus.ac.id') {
+          return;
+        }
+        setCurrentUser(parsed);
       } catch {
         // ignore
       }
@@ -61,9 +73,14 @@ export default function Beranda({ onNavigate }: BerandaProps) {
     };
   }, []);
 
-  const userName = currentUser?.name || currentUser?.nama || 'Agam Mujiono';
-  const rawNim = currentUser?.nim;
-  const userNim = (rawNim && rawNim !== 'Mujiono') ? rawNim : (currentUser?.email ? '21537144001' : '-');
+  const activeUser: {
+    name?: string;
+    nama?: string;
+    nim?: string;
+    email?: string;
+  } | null = liveProfile || currentUser;
+  const userName = activeUser?.nama || activeUser?.name || 'Mahasiswa';
+  const userNim = activeUser?.nim || (activeUser?.email ? '-' : '-');
 
   const statCards = [
     { label: 'Total Pengajuan', value: String(stats?.total ?? 0), sub: 'Sepanjang waktu', color: '#4b3f9e', bg: '#ece9fe' },

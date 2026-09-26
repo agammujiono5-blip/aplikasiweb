@@ -22,6 +22,7 @@ import KelolaRuangan from './pages/admin/KelolaRuangan';
 import AdminJadwal from './pages/admin/AdminJadwal';
 import DataPengguna from './pages/admin/DataPengguna';
 import LogAktivitas from './pages/admin/LogAktivitas';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 type Screen = 'loading' | 'login' | 'admin-login' | 'register' | 'forgot-password' | 'reset-password' | 'app';
 
@@ -104,7 +105,6 @@ export default function App() {
             const data = await adminRes.json();
             if (data.user) {
               localStorage.setItem('admin_user_data', JSON.stringify(data.user));
-              localStorage.setItem('user_data', JSON.stringify(data.user));
             }
             applyResolvedAuth('app', 'admin');
             return;
@@ -249,7 +249,6 @@ export default function App() {
       onLogin={handleLogin}
       onNavigateRegister={() => navigateTo('/register', 'register')}
       onNavigateForgotPassword={() => navigateTo('/forgot-password', 'forgot-password')}
-      onNavigateAdmin={() => navigateTo('/admin/login', 'admin-login')}
     />
   );
 
@@ -278,7 +277,9 @@ export default function App() {
 
   return (
     <Layout role={role} activePage={activePage} onNavigate={handleNavigate} onLogout={handleLogout}>
-      {renderPage()}
+      <ErrorBoundary key={`${role}-${activePage}`}>
+        {renderPage()}
+      </ErrorBoundary>
     </Layout>
   );
 }

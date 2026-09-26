@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\Notification;
 use App\Models\Peminjaman;
 use App\Models\Room;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -516,6 +517,7 @@ class PeminjamanController extends Controller
             ]);
 
             foreach ($peminjamans as $p) {
+                $tgl = $p->tanggal ? Carbon::parse($p->tanggal)->format('Y-m-d') : '-';
                 fputcsv($handle, [
                     $p->ticket_number,
                     $p->nama_kegiatan,
@@ -523,7 +525,7 @@ class PeminjamanController extends Controller
                     $p->user?->name ?? '-',
                     $p->user?->nim ?? '-',
                     $p->room?->name ?? '-',
-                    $p->tanggal,
+                    $tgl,
                     $p->jam_mulai,
                     $p->jam_selesai,
                     $p->estimasi_peserta,
@@ -532,6 +534,207 @@ class PeminjamanController extends Controller
                     $p->created_at?->format('Y-m-d H:i:s') ?? '',
                 ]);
             }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Import peminjaman from CSV (Admin only).
+     */
+    public function importAdmin(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240',
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+
+        $handle = fopen($path, 'r');
+        if (! $handle) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal membuka dan membaca file CSV.',
+            ], 422);
+        }
+
+        // Read BOM if present
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        // Read header
+        $header = fgetcsv($handle, 0, ',', '"', '\\');
+        if (! $header) {
+            fclose($handle);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'File CSV kosong atau tidak memiliki baris header.',
+            ], 422);
+        }
+
+        $cleanHeader = array_map(function ($h) {
+            return strtolower(trim(preg_replace('/[^a-zA-Z0-9_]/', '', str_replace(' ', '_', $h))));
+        }, $header);
+
+        $defaultUser = User::first();
+        $defaultRoom = Room::first();
+        $allRooms = Room::all();
+        $allUsers = User::all();
+
+        $imported = 0;
+        $errors = [];
+        $rowNum = 1;
+
+        while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
+            $rowNum++;
+            if (empty(array_filter($row))) {
+                continue;
+            }
+
+            $data = [];
+            foreach ($cleanHeader as $idx => $key) {
+                $data[$key] = isset($row[$idx]) ? trim($row[$idx]) : '';
+            }
+
+            $namaKegiatan = $data['nama_kegiatan'] ?? $data['kegiatan'] ?? $data['nama'] ?? '';
+            if (empty($namaKegiatan)) {
+                $errors[] = "Baris {$rowNum}: Kolom Nama Kegiatan tidak boleh kosong.";
+                continue;
+            }
+
+            $organisasi = $data['organisasi'] ?? $data['instansi'] ?? 'Umum/Mahasiswa';
+            $tanggal = $data['tanggal'] ?? $data['date'] ?? date('Y-m-d');
+            try {
+                $tanggalFormatted = Carbon::parse($tanggal)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                $tanggalFormatted = date('Y-m-d');
+            }
+
+            $jamMulai = $data['jam_mulai'] ?? $data['mulai'] ?? '08:00';
+            $jamSelesai = $data['jam_selesai'] ?? $data['selesai'] ?? '12:00';
+            $peserta = isset($data['estimasi_peserta']) && is_numeric($data['estimasi_peserta'])
+                ? (int) $data['estimasi_peserta']
+                : (isset($data['peserta']) && is_numeric($data['peserta']) ? (int) $data['peserta'] : 50);
+
+            $statusRaw = strtolower($data['status'] ?? 'menunggu');
+            $status = in_array($statusRaw, ['disetujui', 'ditolak']) ? $statusRaw : 'menunggu';
+            $rejectNote = $data['alasan_penolakan'] ?? $data['reject_note'] ?? null;
+
+            // Match Room
+            $roomName = $data['ruangan'] ?? $data['ruang'] ?? $data['room'] ?? '';
+            $matchedRoom = null;
+            if (! empty($roomName)) {
+                $matchedRoom = $allRooms->first(function ($r) use ($roomName) {
+                    return stripos($r->name, $roomName) !== false || stripos($roomName, $r->name) !== false;
+                });
+            }
+            $roomId = $matchedRoom ? $matchedRoom->id : ($defaultRoom ? $defaultRoom->id : 1);
+
+            // Match User
+            $userNim = $data['nim'] ?? '';
+            $userName = $data['pemohon'] ?? $data['user'] ?? '';
+            $matchedUser = null;
+            if (! empty($userNim)) {
+                $matchedUser = $allUsers->firstWhere('nim', $userNim);
+            }
+            if (! $matchedUser && ! empty($userName)) {
+                $matchedUser = $allUsers->first(function ($u) use ($userName) {
+                    return stripos($u->name, $userName) !== false;
+                });
+            }
+            $userId = $matchedUser ? $matchedUser->id : ($defaultUser ? $defaultUser->id : 1);
+
+            // Ticket number
+            $ticket = $data['no_tiket'] ?? $data['ticket_number'] ?? '';
+            if (empty($ticket) || Peminjaman::where('ticket_number', $ticket)->exists()) {
+                $year = Carbon::parse($tanggalFormatted)->format('Y');
+                do {
+                    $ticket = '#RNG-' . $year . '-' . mt_rand(1000, 9999);
+                } while (Peminjaman::where('ticket_number', $ticket)->exists());
+            }
+
+            Peminjaman::create([
+                'ticket_number' => $ticket,
+                'user_id' => $userId,
+                'room_id' => $roomId,
+                'nama_kegiatan' => $namaKegiatan,
+                'organisasi' => $organisasi,
+                'jenis_kegiatan' => $data['jenis_kegiatan'] ?? 'Kegiatan Kampus',
+                'tanggal' => $tanggalFormatted,
+                'jam_mulai' => $jamMulai,
+                'jam_selesai' => $jamSelesai,
+                'estimasi_peserta' => $peserta,
+                'keperluan' => $data['keperluan'] ?? $namaKegiatan,
+                'fasilitas' => ['Proyektor', 'AC'],
+                'catatan' => $data['catatan'] ?? 'Diimpor oleh Administrator via CSV',
+                'status' => $status,
+                'reject_note' => $rejectNote,
+            ]);
+
+            $imported++;
+        }
+
+        fclose($handle);
+
+        self::flushPeminjamanCache();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Berhasil mengimpor {$imported} data peminjaman dari CSV.",
+            'imported_count' => $imported,
+            'errors' => $errors,
+        ]);
+    }
+
+    /**
+     * Download sample CSV template for Import.
+     */
+    public function templateCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $filename = 'template_import_peminjaman_2026.csv';
+
+        return response()->streamDownload(function () {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($handle, [
+                'Nama Kegiatan', 'Organisasi', 'NIM', 'Pemohon',
+                'Ruangan', 'Tanggal', 'Jam Mulai', 'Jam Selesai',
+                'Estimasi Peserta', 'Status', 'Alasan Penolakan'
+            ]);
+
+            fputcsv($handle, [
+                'Seminar Kecerdasan Buatan dan Big Data 2026',
+                'BEM Fasilkom',
+                '2021001234',
+                'Ahmad Fauzi',
+                'Auditorium Rektorat Lt. 3',
+                '2026-10-15',
+                '08:00',
+                '12:30',
+                '250',
+                'disetujui',
+                ''
+            ]);
+
+            fputcsv($handle, [
+                'Workshop Pengembangan Web Interaktif',
+                'Himpunan Mahasiswa Informatika',
+                '2022009012',
+                'Siti Nurhaliza',
+                'Lab Multimedia Fasilkom',
+                '2026-10-18',
+                '09:00',
+                '15:00',
+                '40',
+                'menunggu',
+                ''
+            ]);
 
             fclose($handle);
         }, $filename, [

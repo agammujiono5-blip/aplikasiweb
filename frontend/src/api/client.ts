@@ -512,6 +512,36 @@ export const api = {
       a.remove();
       window.URL.revokeObjectURL(url);
     },
+    async importPeminjaman(file: File): Promise<{ status: string; message: string; imported_count: number; errors?: string[] }> {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API_BASE}/admin/peminjaman/import`, {
+        method: 'POST',
+        headers: getAuthHeaders(true, 'admin'),
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json.message || 'Gagal mengimpor file CSV.');
+      }
+      broadcastUpdate();
+      return json;
+    },
+    async downloadTemplateCsv() {
+      const res = await fetch(`${API_BASE}/admin/peminjaman/template-csv`, {
+        headers: getAuthHeaders(false, 'admin'),
+      });
+      if (!res.ok) throw new Error('Gagal mengunduh template CSV.');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template_import_peminjaman_2026.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
   },
 };
 

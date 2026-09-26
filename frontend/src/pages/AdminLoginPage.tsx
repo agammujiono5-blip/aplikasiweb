@@ -47,7 +47,6 @@ export default function AdminLoginPage({ onLogin, onNavigateLogin }: AdminLoginP
         localStorage.setItem('admin_user_data', JSON.stringify(data.user));
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('user_role', 'admin');
-        localStorage.setItem('user_data', JSON.stringify(data.user));
       }
 
       onLogin('admin');

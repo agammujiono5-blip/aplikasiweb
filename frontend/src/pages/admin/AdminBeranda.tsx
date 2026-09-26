@@ -1,5 +1,5 @@
 import { api, useLiveQuery } from '../../api/client';
-import { showToast } from '../../components/Toast';
+import { showToast } from '../../utils/toast';
 
 interface AdminBerandaProps {
   onNavigate: (page: string) => void;
@@ -9,8 +9,8 @@ export default function AdminBeranda({ onNavigate }: AdminBerandaProps) {
   const { data: stats, refetch } = useLiveQuery(() => api.peminjaman.getAdminStats());
 
   // Logged-in admin user info
-  const storedUser = localStorage.getItem('user_data');
-  const adminName = storedUser ? JSON.parse(storedUser).name : 'Bpk. Hendra';
+  const storedUser = localStorage.getItem('admin_user_data') || localStorage.getItem('user_data');
+  const adminName = storedUser ? (JSON.parse(storedUser).name || JSON.parse(storedUser).nama || 'Bpk. Hendra') : 'Bpk. Hendra';
 
   const handleQuickApprove = async (dbId: number) => {
     try {

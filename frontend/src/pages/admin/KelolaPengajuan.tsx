@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, useLiveQuery } from '../../api/client';
 import type { PeminjamanItem } from '../../api/client';
-import { showToast } from '../../components/Toast';
+import { showToast } from '../../utils/toast';
 
 type Status = 'menunggu' | 'disetujui' | 'ditolak';
 
@@ -19,6 +19,10 @@ export default function KelolaPengajuan() {
   const [action, setAction] = useState<'approve' | 'reject' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
 
   const handleExport = async () => {
     setExportLoading(true);
@@ -31,6 +35,32 @@ export default function KelolaPengajuan() {
       showToast('Gagal mengekspor: ' + (e instanceof Error ? e.message : String(e)), 'error');
     } finally {
       setExportLoading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImportLoading(true);
+    setImportError('');
+    try {
+      const res = await api.export.importPeminjaman(importFile);
+      showToast(res.message || `Berhasil mengimpor ${res.imported_count} data`, 'success');
+      setShowImportModal(false);
+      setImportFile(null);
+      await refetch();
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      await api.export.downloadTemplateCsv();
+      showToast('Template CSV berhasil diunduh', 'success');
+    } catch (e) {
+      showToast('Gagal mengunduh template: ' + (e instanceof Error ? e.message : String(e)), 'error');
     }
   };
 
@@ -99,18 +129,35 @@ export default function KelolaPengajuan() {
             <h1 className="text-[#111c2d] text-[28px] font-bold tracking-[-0.6px]">Kelola Pengajuan</h1>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mt-1" title="Real-time live sync aktif" />
           </div>
-          <button
-            onClick={handleExport}
-            disabled={exportLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-[10px] bg-[#fff3cd] text-[#b45309] text-[13px] font-semibold hover:bg-[#fde68a] transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            {exportLoading ? 'Mengekspor...' : 'Export CSV'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setShowImportModal(true);
+                setImportError('');
+                setImportFile(null);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-[10px] bg-[#ece9fe] text-[#4b3f9e] text-[13px] font-semibold hover:bg-[#dedaff] transition-colors cursor-pointer"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Import CSV
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exportLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-[10px] bg-[#fff3cd] text-[#b45309] text-[13px] font-semibold hover:bg-[#fde68a] transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              {exportLoading ? 'Mengekspor...' : 'Export CSV'}
+            </button>
+          </div>
         </div>
         <p className="text-[#474552] text-[14px]">Tinjau, setujui, atau tolak pengajuan peminjaman ruang dari mahasiswa secara real-time.</p>
       </div>
@@ -365,6 +412,117 @@ export default function KelolaPengajuan() {
                   Konfirmasi Tolak
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Import CSV */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[16px] max-w-[500px] w-full p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-[#ece9fe] text-[#4b3f9e] flex items-center justify-center font-bold text-sm">
+                  📄
+                </span>
+                <div>
+                  <h3 className="text-[#111c2d] text-[18px] font-bold">Import Data CSV</h3>
+                  <p className="text-[#787583] text-[12px]">Unggah berkas spreadsheet peminjaman kampus</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowImportModal(false); setImportFile(null); }}
+                className="text-[#787583] hover:text-[#111c2d] text-[20px] font-bold cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Template Download Help */}
+            <div className="bg-[#f8f9fc] border border-[rgba(201,196,212,0.4)] rounded-[12px] p-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[13px] font-semibold text-[#111c2d]">Format Standar CSV 2026</p>
+                <p className="text-[11px] text-[#787583]">Gunakan template resmi agar data kolom terbaca sempurna.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="shrink-0 px-3 py-1.5 bg-white border border-[rgba(201,196,212,0.7)] hover:bg-[#ece9fe] text-[#4b3f9e] text-[12px] font-semibold rounded-[8px] transition-colors cursor-pointer"
+              >
+                Unduh Template
+              </button>
+            </div>
+
+            {/* Error banner */}
+            {importError && (
+              <div className="bg-[#fee2e2] border border-[#fecdd3] rounded-[10px] p-3 text-[#991b1b] text-[12px]">
+                {importError}
+              </div>
+            )}
+
+            {/* Upload Area */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[13px] font-medium text-[#474552]">Pilih File CSV (.csv):</label>
+              <div
+                className="border-2 border-dashed border-[rgba(201,196,212,0.8)] hover:border-[#4b3f9e] rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-2 bg-[#fcfcff] cursor-pointer transition-colors"
+                onClick={() => document.getElementById('csvFileInput')?.click()}
+              >
+                <input
+                  id="csvFileInput"
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setImportFile(e.target.files[0]);
+                      setImportError('');
+                    }
+                  }}
+                />
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4b3f9e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {importFile ? (
+                  <div className="flex flex-col items-center">
+                    <span className="text-[13px] font-bold text-[#111c2d]">{importFile.name}</span>
+                    <span className="text-[11px] text-[#787583]">{(importFile.size / 1024).toFixed(1)} KB</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[13px] font-semibold text-[#111c2d]">Klik atau seret file CSV ke sini</p>
+                    <p className="text-[11px] text-[#787583]">Maksimal ukuran file 10 MB</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2 border-t border-[rgba(201,196,212,0.3)]">
+              <button
+                type="button"
+                onClick={() => { setShowImportModal(false); setImportFile(null); }}
+                className="px-4 py-2 border rounded-[8px] text-[13px] font-semibold text-[#474552] hover:bg-[#f5f6fa] cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={!importFile || importLoading}
+                className="px-5 py-2 bg-[#4b3f9e] hover:bg-[#342586] text-white rounded-[8px] text-[13px] font-semibold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {importLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Mengimpor...</span>
+                  </>
+                ) : (
+                  'Mulai Impor CSV'
+                )}
+              </button>
             </div>
           </div>
         </div>

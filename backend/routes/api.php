@@ -63,6 +63,8 @@ Route::middleware(['auth:sanctum', 'auth.admin'])->prefix('admin')->group(functi
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('api.admin.activity_logs');
 
-    // Export
+    // Export & Import CSV
     Route::get('/peminjaman/export', [PeminjamanController::class, 'exportAdmin'])->name('api.admin.peminjaman.export');
+    Route::post('/peminjaman/import', [PeminjamanController::class, 'importAdmin'])->name('api.admin.peminjaman.import');
+    Route::get('/peminjaman/template-csv', [PeminjamanController::class, 'templateCsv'])->name('api.admin.peminjaman.template_csv');
 });

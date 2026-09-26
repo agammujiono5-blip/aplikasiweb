@@ -11,22 +11,24 @@ const getInitialProfile = (): UserProfileData => {
     const raw = localStorage.getItem('user_data');
     if (raw) {
       const u = JSON.parse(raw);
-      return {
-        id: u.id || 1,
-        nama: u.name || u.nama || 'Mahasiswa',
-        nim: u.nim || '',
-        email: u.email || '',
-        phone: u.phone || u.noHp || '',
-        noHp: u.phone || u.noHp || '',
-        prodi: u.prodi || '',
-        fakultas: u.fakultas || '',
-        angkatan: u.angkatan || '',
-        organisasi: u.organisasi || '',
-        jabatan: u.jabatan || '',
-        alamat: u.alamat || '',
-        bio: u.bio || '',
-        is_active: u.is_active ?? true,
-      };
+      if (!u?.petugas_id && !u?.name?.toLowerCase().includes('petugas') && u?.email !== 'admin@kampus.ac.id') {
+        return {
+          id: u.id || 1,
+          nama: u.nama || u.name || 'Mahasiswa',
+          nim: u.nim || '',
+          email: u.email || '',
+          phone: u.phone || u.noHp || '',
+          noHp: u.phone || u.noHp || '',
+          prodi: u.prodi || '',
+          fakultas: u.fakultas || '',
+          angkatan: u.angkatan || '',
+          organisasi: u.organisasi || '',
+          jabatan: u.jabatan || '',
+          alamat: u.alamat || '',
+          bio: u.bio || '',
+          is_active: u.is_active ?? true,
+        };
+      }
     }
   } catch {
     // ignore

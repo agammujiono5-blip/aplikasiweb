@@ -13,9 +13,11 @@ const statusColor: Record<string, string> = {
 };
 
 export default function AdminJadwal() {
-  const [year, setYear] = useState(2024);
-  const [month, setMonth] = useState(9); // Oct default
-  const [selectedDate, setSelectedDate] = useState<string | null>('2024-10-25');
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const [selectedDate, setSelectedDate] = useState<string | null>(todayStr);
 
   const { data: allEventsData } = useLiveQuery(() => api.jadwal.get());
   const allEvents = allEventsData || {};

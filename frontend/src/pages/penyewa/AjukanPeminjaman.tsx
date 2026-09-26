@@ -35,11 +35,21 @@ export default function AjukanPeminjaman({ onNavigate }: AjukanProps) {
   const { data: allJadwal } = useLiveQuery(() => api.jadwal.get());
 
   const storedUser = localStorage.getItem('user_data');
-  const user = storedUser ? JSON.parse(storedUser) : null;
+  let user: { organisasi?: string; name?: string; nama?: string; nim?: string } | null = null;
+  try {
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      if (!parsed?.petugas_id && !parsed?.name?.toLowerCase().includes('petugas') && parsed?.email !== 'admin@kampus.ac.id') {
+        user = parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
 
   const [form, setForm] = useState({
     namaKegiatan: '',
-    organisasi: user?.organisasi || (user?.name ? `Organisasi ${user.name}` : 'BEM Fasilkom'),
+    organisasi: user?.organisasi || (user?.nama || user?.name ? `HIMA / UKM ${(user?.nama || user?.name)}` : 'BEM Universitas'),
     jenisKegiatan: 'Seminar / Workshop',
     ruangan: '',
     tanggal: '',

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api, useLiveQuery } from '../api/client';
 import NotificationBell from './NotificationBell';
 import ToastContainer from './Toast';
 
@@ -96,7 +97,13 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
 
   const navItems = role === 'penyewa' ? penyewaNav : adminNav;
 
-  const [currentUser, setCurrentUser] = useState<{
+  // Live query for student profile to always stay synchronized with the database
+  const { data: liveProfile } = useLiveQuery(
+    () => (role === 'penyewa' ? api.users.getProfile() : Promise.resolve(null)),
+    [role]
+  );
+
+  const [storedUser, setStoredUser] = useState<{
     name?: string;
     nama?: string;
     nim?: string;
@@ -105,8 +112,18 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
     jabatan?: string;
   } | null>(() => {
     try {
-      const stored = localStorage.getItem('user_data');
-      return stored ? JSON.parse(stored) : null;
+      if (role === 'admin') {
+        const adminStored = localStorage.getItem('admin_user_data') || localStorage.getItem('user_data');
+        return adminStored ? JSON.parse(adminStored) : null;
+      }
+      const userStored = localStorage.getItem('user_data');
+      if (!userStored) return null;
+      const parsed = JSON.parse(userStored);
+      // Guard against contaminated admin data in user_data
+      if (parsed?.petugas_id || parsed?.name?.toLowerCase().includes('petugas') || parsed?.email === 'admin@kampus.ac.id') {
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -115,12 +132,28 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
   useEffect(() => {
     const syncUser = () => {
       try {
-        const stored = localStorage.getItem('user_data');
-        if (stored) setCurrentUser(JSON.parse(stored));
+        if (role === 'admin') {
+          const adminStored = localStorage.getItem('admin_user_data') || localStorage.getItem('user_data');
+          setStoredUser(adminStored ? JSON.parse(adminStored) : null);
+        } else {
+          const userStored = localStorage.getItem('user_data');
+          if (!userStored) {
+            setStoredUser(null);
+            return;
+          }
+          const parsed = JSON.parse(userStored);
+          if (parsed?.petugas_id || parsed?.name?.toLowerCase().includes('petugas') || parsed?.email === 'admin@kampus.ac.id') {
+            setStoredUser(null);
+            return;
+          }
+          setStoredUser(parsed);
+        }
       } catch {
         // ignore
       }
     };
+
+    syncUser();
 
     window.addEventListener('sipinjam:realtime-update', syncUser);
     window.addEventListener('storage', syncUser);
@@ -128,17 +161,37 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
       window.removeEventListener('sipinjam:realtime-update', syncUser);
       window.removeEventListener('storage', syncUser);
     };
-  }, []);
+  }, [role]);
 
-  const rawName = currentUser?.name || currentUser?.nama;
+  // Synchronize localStorage when liveProfile arrives
+  useEffect(() => {
+    if (role === 'penyewa' && liveProfile) {
+      try {
+        localStorage.setItem('user_data', JSON.stringify(liveProfile));
+      } catch {
+        // ignore
+      }
+    }
+  }, [role, liveProfile]);
+
+  const activeUser: {
+    name?: string;
+    nama?: string;
+    nim?: string;
+    email?: string;
+    petugas_id?: string;
+    jabatan?: string;
+  } | null = role === 'penyewa' ? (liveProfile || storedUser) : storedUser;
+
+  const rawName = activeUser?.nama || activeUser?.name;
   const userName = rawName || (role === 'penyewa' ? 'Mahasiswa' : 'Admin Sarpras');
   const userSub = role === 'penyewa'
-    ? (currentUser?.nim ? `NIM: ${currentUser.nim}` : (currentUser?.email || 'Mahasiswa'))
-    : (currentUser?.petugas_id ? `ID: ${currentUser.petugas_id}` : (currentUser?.jabatan || 'Petugas Sarpras'));
+    ? (activeUser?.nim ? `NIM: ${activeUser.nim}` : (activeUser?.email || 'Mahasiswa'))
+    : (activeUser?.petugas_id ? `ID: ${activeUser.petugas_id}` : (activeUser?.jabatan || activeUser?.email || 'Petugas Sarpras'));
   const userInitials = userName
     .split(' ')
     .filter(Boolean)
-    .map(n => n[0])
+    .map((n: string) => n[0])
     .slice(0, 2)
     .join('')
     .toUpperCase() || (role === 'penyewa' ? 'M' : 'A');

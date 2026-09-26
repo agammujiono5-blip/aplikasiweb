@@ -5,10 +5,9 @@ interface LoginPageProps {
   onLogin: (role: Role) => void;
   onNavigateRegister?: () => void;
   onNavigateForgotPassword?: () => void;
-  onNavigateAdmin?: () => void;
 }
 
-export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgotPassword, onNavigateAdmin }: LoginPageProps) {
+export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgotPassword }: LoginPageProps) {
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -142,15 +141,6 @@ export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgo
               </svg>
               <span className="block leading-snug">{error}</span>
             </div>
-            {error.includes('Administrator') && (
-              <button
-                type="button"
-                onClick={() => onNavigateAdmin ? onNavigateAdmin() : (window.location.pathname = '/admin/login')}
-                className="self-start text-[12px] font-bold text-amber-200 hover:text-amber-100 underline pl-6 cursor-pointer"
-              >
-                Klik di sini untuk langsung ke Halaman Login Admin &rarr;
-              </button>
-            )}
           </div>
         )}
 
@@ -254,18 +244,6 @@ export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgo
             ) : (
               <span className="hover:text-white transition-colors cursor-pointer">Sign Up</span>
             )}
-          </div>
-
-          {/* Switch to Admin Login Portal */}
-          <div className="pt-3 mt-1 border-t border-white/15 flex items-center justify-center">
-            <button
-              type="button"
-              onClick={() => onNavigateAdmin ? onNavigateAdmin() : (window.location.pathname = '/admin/login')}
-              className="text-[12px] text-white/75 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer py-1 group"
-            >
-              <span>Petugas / Pengelola Sarpras?</span>
-              <span className="font-semibold text-amber-300 group-hover:text-amber-200 underline">Login Admin &rarr;</span>
-            </button>
           </div>
         </form>
       </div>

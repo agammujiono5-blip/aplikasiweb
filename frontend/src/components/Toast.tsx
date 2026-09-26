@@ -1,19 +1,11 @@
 import { useState, useEffect } from 'react';
-
-export type ToastType = 'success' | 'error' | 'info';
+import type { ToastType } from '../utils/toast';
 
 interface ToastMessage {
   id: string;
   message: string;
   type: ToastType;
 }
-
-export const showToast = (message: string, type: ToastType = 'info') => {
-  const event = new CustomEvent('sipinjam:toast', {
-    detail: { message, type }
-  });
-  window.dispatchEvent(event);
-};
 
 const icons = {
   success: (
