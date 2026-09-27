@@ -441,6 +441,7 @@ class PeminjamanController extends Controller
 
         $res = Cache::remember($cacheKey, 120, function () use ($roomId) {
             $query = Peminjaman::with(['room', 'user'])
+                ->whereIn('status', ['disetujui', 'menunggu'])
                 ->orderBy('tanggal', 'asc')
                 ->orderBy('jam_mulai', 'asc');
 

@@ -201,7 +201,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
           <div>
             <input
               type="text"
-              placeholder="Nama Lengkap *"
+              placeholder="Nama Lengkap"
               value={name}
               onChange={e => setName(e.target.value)}
               required
@@ -218,7 +218,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               type="text"
-              placeholder="NIM (Nomor Induk Mahasiswa - contoh: 21537144001) *"
+              placeholder="NIM  (Nomor Induk Mahasiswa) "
               value={nim}
               onChange={e => setNim(e.target.value)}
               required
@@ -247,7 +247,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
           <div>
             <input
               type="email"
-              placeholder="Email Kampus * (contoh@student.uny.ac.id)"
+              placeholder="Email Kampus  (contoh@student.uny.ac.id)"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
@@ -264,7 +264,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
           <div className="relative">
             <input
               type={showPass ? 'text' : 'password'}
-              placeholder="Kata Sandi *"
+              placeholder="Kata Sandi "
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
@@ -316,7 +316,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
           <div className="relative">
             <input
               type={showConfirmPass ? 'text' : 'password'}
-              placeholder="Konfirmasi Kata Sandi *"
+              placeholder="Konfirmasi Kata Sandi "
               value={passwordConfirmation}
               onChange={e => setPasswordConfirmation(e.target.value)}
               required

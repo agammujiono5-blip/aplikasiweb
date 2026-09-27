@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { ClipboardList } from 'lucide-react';
 import { api } from '../../api/client';
 import { useLiveQuery } from '../../api/client';
 
@@ -97,7 +98,9 @@ export default function LogAktivitas() {
           </div>
         ) : (logs ?? []).length === 0 ? (
           <div className="p-12 text-center text-[#787583] text-[14px]">
-            <div className="text-4xl mb-3">📄</div>
+            <div className="w-16 h-16 rounded-full bg-[#f8f9fc] flex items-center justify-center mx-auto mb-3 text-[#787583]/50">
+              <ClipboardList className="w-8 h-8" />
+            </div>
             Belum ada log aktivitas.
           </div>
         ) : (

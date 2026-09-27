@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Bell, MessageSquare, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import type { NotificationItem } from '../api/client';
 
@@ -16,11 +17,11 @@ const IconClose = () => (
 );
 
 // ─── Type config ─────────────────────────────────────────────────────────────
-const typeConfig: Record<string, { icon: string; accent: string; bg: string; label: string }> = {
-  info:    { icon: '💬', accent: '#4b3f9e', bg: '#f0effe', label: 'Info' },
-  success: { icon: '✅', accent: '#059669', bg: '#ecfdf5', label: 'Disetujui' },
-  warning: { icon: '⚠️', accent: '#d97706', bg: '#fffbeb', label: 'Perhatian' },
-  error:   { icon: '❌', accent: '#dc2626', bg: '#fff1f2', label: 'Ditolak' },
+const typeConfig: Record<string, { icon: React.ReactNode; accent: string; bg: string; label: string }> = {
+  info:    { icon: <MessageSquare className="w-4 h-4 text-[#4b3f9e]" />, accent: '#4b3f9e', bg: '#f0effe', label: 'Info' },
+  success: { icon: <CheckCircle2 className="w-4 h-4 text-[#059669]" />, accent: '#059669', bg: '#ecfdf5', label: 'Disetujui' },
+  warning: { icon: <AlertTriangle className="w-4 h-4 text-[#d97706]" />, accent: '#d97706', bg: '#fffbeb', label: 'Perhatian' },
+  error:   { icon: <XCircle className="w-4 h-4 text-[#dc2626]" />, accent: '#dc2626', bg: '#fff1f2', label: 'Ditolak' },
 };
 
 function timeAgo(dateStr: string): string {
@@ -222,7 +223,9 @@ export default function NotificationBell() {
               </div>
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2 px-6">
-                <div className="w-12 h-12 rounded-full bg-[#f0effe] flex items-center justify-center text-2xl mb-1">🔔</div>
+                <div className="w-12 h-12 rounded-full bg-[#f0effe] flex items-center justify-center text-[#4b3f9e] mb-1">
+                  <Bell className="w-6 h-6" />
+                </div>
                 <p className="text-[#111c2d] text-[13px] font-semibold">Belum ada notifikasi</p>
                 <p className="text-[#787583] text-[12px] text-center">Notifikasi pengajuan akan muncul di sini</p>
               </div>

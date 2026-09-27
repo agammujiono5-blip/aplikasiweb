@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { Check, FileText } from 'lucide-react';
 import { api, useLiveQuery } from '../../api/client';
 import type { PeminjamanItem, RoomItem } from '../../api/client';
 
@@ -268,7 +269,7 @@ export default function AjukanPeminjaman({ onNavigate }: AjukanProps) {
           <div key={s.num} className="flex items-center gap-2 flex-1">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold transition-all
               ${step === s.num ? 'bg-[#4b3f9e] text-white shadow-sm' : step > s.num ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-[#f0f1f5] text-[#787583]'}`}>
-              {step > s.num ? '✓' : s.num}
+              {step > s.num ? <Check className="w-4 h-4" /> : s.num}
             </div>
             <span className={`text-[13px] font-medium hidden sm:inline ${step === s.num ? 'text-[#111c2d] font-bold' : 'text-[#787583]'}`}>
               {s.label}
@@ -282,7 +283,7 @@ export default function AjukanPeminjaman({ onNavigate }: AjukanProps) {
       {step === 1 && (
         <div className="bg-white border border-[rgba(201,196,212,0.5)] rounded-[16px] p-6 lg:p-8 shadow-sm flex flex-col gap-6">
           <h2 className="text-[#111c2d] text-[18px] font-bold pb-3 border-b border-[rgba(201,196,212,0.3)] flex items-center gap-2">
-            <span>📝</span> Tahap 1: Detail &amp; Keperluan Kegiatan
+            <FileText className="w-5 h-5 text-[#4b3f9e]" /> Tahap 1: Detail &amp; Keperluan Kegiatan
           </h2>
 
           <div className="flex flex-col gap-4">

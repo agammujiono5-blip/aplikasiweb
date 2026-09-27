@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ShieldCheck, GraduationCap } from 'lucide-react';
 import { api, useLiveQuery } from '../api/client';
 import NotificationBell from './NotificationBell';
 import ToastContainer from './Toast';
@@ -252,13 +253,23 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
         {/* Role badge */}
         <div className="px-5 py-3 border-b border-[rgba(201,196,212,0.2)]">
           <span
-            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 ${
               role === 'admin'
                 ? 'bg-[#ffe4b5] text-[#b45309]'
                 : 'bg-[#ece9fe] text-[#4b3f9e]'
             }`}
           >
-            {role === 'admin' ? '⚙️ Panel Admin' : '🎓 Portal Mahasiswa'}
+            {role === 'admin' ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Panel Admin
+              </>
+            ) : (
+              <>
+                <GraduationCap className="w-3.5 h-3.5" />
+                Portal Mahasiswa
+              </>
+            )}
           </span>
         </div>
 

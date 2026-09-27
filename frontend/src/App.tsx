@@ -286,7 +286,7 @@ export default function App() {
       switch (activePage) {
         case 'beranda': return <Beranda onNavigate={handleNavigate} />;
         case 'ajukan': return <AjukanPeminjaman onNavigate={handleNavigate} />;
-        case 'riwayat': return <RiwayatPage />;
+        case 'riwayat': return <RiwayatPage onNavigate={handleNavigate} />;
         case 'jadwal': return <JadwalRuangan onNavigate={handleNavigate} />;
         case 'profil': return <ProfilSaya onLogout={handleLogout} />;
         default: return <Beranda onNavigate={handleNavigate} />;

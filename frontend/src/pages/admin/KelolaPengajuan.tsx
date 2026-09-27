@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FileText, Download, FileSpreadsheet } from 'lucide-react';
 import { api, useLiveQuery } from '../../api/client';
 import type { PeminjamanItem } from '../../api/client';
 import { showToast } from '../../utils/toast';
@@ -230,8 +231,8 @@ export default function KelolaPengajuan() {
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-[#111c2d] line-clamp-1">{item.nama_kegiatan}</span>
                             {item.berkas_url && (
-                              <span className="text-[10px] font-bold bg-[#ece9fe] text-[#4b3f9e] px-1.5 py-0.5 rounded shrink-0">
-                                📄 Berkas
+                              <span className="text-[10px] font-bold bg-[#ece9fe] text-[#4b3f9e] px-1.5 py-0.5 rounded shrink-0 inline-flex items-center gap-1">
+                                <FileText className="w-3 h-3" /> Berkas
                               </span>
                             )}
                           </div>
@@ -334,7 +335,9 @@ export default function KelolaPengajuan() {
               {selected.berkas_url && (
                 <div className="col-span-2 bg-[#ece9fe]/40 border border-[#c7c4d4] p-3 rounded-[10px] flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-[22px]">📄</span>
+                    <div className="w-9 h-9 rounded-lg bg-[#ece9fe] flex items-center justify-center text-[#4b3f9e] shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
                     <div className="flex flex-col min-w-0">
                       <p className="font-bold text-[#111c2d] text-[12px] truncate">{selected.berkas_name || 'Dokumen Proposal'}</p>
                       <p className="text-[#787583] text-[11px]">Lampiran Proposal / Surat Izin</p>
@@ -344,9 +347,9 @@ export default function KelolaPengajuan() {
                     href={selected.berkas_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-[#4b3f9e] hover:bg-[#342586] text-white text-[12px] font-semibold px-3.5 py-1.5 rounded-[8px] transition-colors shrink-0 flex items-center gap-1 shadow-sm"
+                    className="bg-[#4b3f9e] hover:bg-[#342586] text-white text-[12px] font-semibold px-3.5 py-1.5 rounded-[8px] transition-colors shrink-0 flex items-center gap-1.5 shadow-sm"
                   >
-                    <span>⬇️</span> Unduh Dokumen
+                    <Download className="w-3.5 h-3.5" /> Unduh Dokumen
                   </a>
                 </div>
               )}
@@ -424,7 +427,7 @@ export default function KelolaPengajuan() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-lg bg-[#ece9fe] text-[#4b3f9e] flex items-center justify-center font-bold text-sm">
-                  📄
+                  <FileSpreadsheet className="w-4 h-4" />
                 </span>
                 <div>
                   <h3 className="text-[#111c2d] text-[18px] font-bold">Import Data CSV</h3>

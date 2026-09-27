@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Plus, Sparkles, Building2 } from 'lucide-react';
 import { api, useLiveQuery } from '../../api/client';
 import type { RoomItem } from '../../api/client';
 
@@ -102,7 +103,7 @@ export default function Beranda({ onNavigate }: BerandaProps) {
         <div className="absolute bottom-0 left-32 w-24 h-24 rounded-full bg-white/5" />
         <div className="relative z-10 flex flex-col gap-1">
           <p className="text-white/70 text-[13px] font-normal">Selamat datang kembali,</p>
-          <h2 className="text-white text-[22px] font-bold tracking-[-0.4px]">{userName} 👋</h2>
+          <h2 className="text-white text-[22px] font-bold tracking-[-0.4px]">{userName}</h2>
           <div className="flex items-center gap-2 mt-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" title="Realtime Aktif" />
             <p className="text-white/80 text-[13px]">NIM: {userNim}</p>
@@ -112,7 +113,8 @@ export default function Beranda({ onNavigate }: BerandaProps) {
           onClick={() => onNavigate('ajukan')}
           className="relative z-10 shrink-0 flex items-center gap-2 bg-white text-[#4b3f9e] text-[14px] font-semibold px-5 py-[10px] rounded-[10px] hover:bg-white/90 transition-colors shadow-md cursor-pointer"
         >
-          + Ajukan Peminjaman
+          <Plus className="w-4 h-4" />
+          Ajukan Peminjaman
         </button>
       </div>
 
@@ -154,9 +156,9 @@ export default function Beranda({ onNavigate }: BerandaProps) {
           <div className="flex flex-col divide-y divide-[rgba(201,196,212,0.3)]">
             {recentActivity.length === 0 ? (
               <div className="p-12 flex flex-col items-center justify-center text-center">
-                <div className="w-20 h-20 bg-[#f0effe] rounded-full flex items-center justify-center mb-4 relative">
+                <div className="w-20 h-20 bg-[#f0effe] rounded-full flex items-center justify-center mb-4 relative text-[#4b3f9e]">
                   <div className="absolute inset-0 bg-[#4b3f9e] opacity-10 rounded-full animate-ping" />
-                  <span className="text-4xl relative z-10">🚀</span>
+                  <Sparkles className="w-9 h-9 relative z-10" />
                 </div>
                 <h4 className="text-[#111c2d] text-[15px] font-bold mb-1">Mulai Peminjaman Baru!</h4>
                 <p className="text-[#787583] text-[13px] max-w-[250px] mb-4">
@@ -164,8 +166,9 @@ export default function Beranda({ onNavigate }: BerandaProps) {
                 </p>
                 <button 
                   onClick={() => onNavigate('ajukan')}
-                  className="bg-[#4b3f9e] hover:bg-[#342586] text-white px-5 py-2 rounded-[8px] text-[13px] font-semibold transition-colors"
+                  className="bg-[#4b3f9e] hover:bg-[#342586] text-white px-5 py-2 rounded-[8px] text-[13px] font-semibold transition-colors inline-flex items-center gap-1.5"
                 >
+                  <Plus className="w-4 h-4" />
                   Ajukan Peminjaman
                 </button>
               </div>
@@ -174,8 +177,8 @@ export default function Beranda({ onNavigate }: BerandaProps) {
                 const s = statusStyle[item.status] || { bg: '#f0f1f5', border: '#ddd', text: '#787583', label: item.status };
                 return (
                   <div key={item.id} className="flex items-start gap-3 px-5 py-4 hover:bg-[#fafafc] transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-[#ece9fe] flex items-center justify-center shrink-0 mt-0.5 text-[#4b3f9e] font-bold text-[11px]">
-                      🏢
+                    <div className="w-8 h-8 rounded-full bg-[#ece9fe] flex items-center justify-center shrink-0 mt-0.5 text-[#4b3f9e]">
+                      <Building2 className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <div className="flex items-start justify-between gap-2">

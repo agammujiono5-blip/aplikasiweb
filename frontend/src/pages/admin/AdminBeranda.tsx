@@ -1,5 +1,6 @@
 import { api, useLiveQuery } from '../../api/client';
 import { showToast } from '../../utils/toast';
+import { CheckCircle2, Clock } from 'lucide-react';
 
 interface AdminBerandaProps {
   onNavigate: (page: string) => void;
@@ -74,7 +75,7 @@ export default function AdminBeranda({ onNavigate }: AdminBerandaProps) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <p className="text-[#787583] text-[13px]">Selamat datang kembali,</p>
-          <h1 className="text-[#111c2d] text-[26px] font-bold tracking-[-0.5px]">{adminName} 👋</h1>
+          <h1 className="text-[#111c2d] text-[26px] font-bold tracking-[-0.5px]">{adminName}</h1>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <p className="text-[#474552] text-[13px]">Petugas Sarpras · Real-time Live Sync Aktif</p>
@@ -154,9 +155,9 @@ export default function AdminBeranda({ onNavigate }: AdminBerandaProps) {
           <div className="flex flex-col divide-y divide-[rgba(201,196,212,0.3)]">
             {pendingItems.length === 0 ? (
               <div className="p-12 flex flex-col items-center justify-center text-center">
-                <div className="w-20 h-20 bg-[#f5f6fa] rounded-full flex items-center justify-center mb-4 relative">
-                  <div className="absolute inset-0 bg-[#4b3f9e] opacity-5 rounded-full animate-ping" />
-                  <span className="text-4xl relative z-10">☕</span>
+                <div className="w-20 h-20 bg-[#ecfdf5] rounded-full flex items-center justify-center mb-4 relative">
+                  <div className="absolute inset-0 bg-emerald-500 opacity-10 rounded-full animate-ping" />
+                  <CheckCircle2 className="w-10 h-10 text-emerald-600 relative z-10" />
                 </div>
                 <h4 className="text-[#111c2d] text-[15px] font-bold mb-1">Tidak ada antrean!</h4>
                 <p className="text-[#787583] text-[13px] max-w-[250px]">Semua pengajuan sudah diverifikasi. Nikmati waktu istirahat Anda.</p>
@@ -164,7 +165,9 @@ export default function AdminBeranda({ onNavigate }: AdminBerandaProps) {
             ) : (
               pendingItems.map(item => (
                 <div key={item.id} className="px-5 py-4 flex items-start gap-3 hover:bg-[#fafafc] transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-[#fef3c7] flex items-center justify-center shrink-0 mt-0.5 text-[14px]">⏳</div>
+                  <div className="w-8 h-8 rounded-full bg-[#fef3c7] text-[#b45309] flex items-center justify-center shrink-0 mt-0.5">
+                    <Clock className="w-4 h-4" />
+                  </div>
                   <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-[#111c2d] text-[13px] font-semibold leading-snug">{item.title}</span>

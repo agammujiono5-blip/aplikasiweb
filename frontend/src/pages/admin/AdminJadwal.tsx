@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Calendar, Clock, MapPin, User } from 'lucide-react';
 import { api, useLiveQuery } from '../../api/client';
 
 const MONTH_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -46,12 +47,14 @@ export default function AdminJadwal() {
 
       {selectedDate && totalToday > 0 && (
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="bg-[#ece9fe] text-[#4b3f9e] text-[13px] font-semibold px-4 py-2 rounded-[8px]">
-            📅 {selectedDate.split('-').reverse().join('/')}: <strong>{totalToday}</strong> kegiatan terjadwal
+          <div className="bg-[#ece9fe] text-[#4b3f9e] text-[13px] font-semibold px-4 py-2 rounded-[8px] inline-flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            <span>{selectedDate.split('-').reverse().join('/')}: <strong>{totalToday}</strong> kegiatan terjadwal</span>
           </div>
           {pending > 0 && (
-            <div className="bg-[#fef3c7] text-[#92400e] text-[13px] font-semibold px-4 py-2 rounded-[8px]">
-              ⏳ {pending} menunggu verifikasi
+            <div className="bg-[#fef3c7] text-[#92400e] text-[13px] font-semibold px-4 py-2 rounded-[8px] inline-flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span>{pending} menunggu verifikasi</span>
             </div>
           )}
         </div>
@@ -134,10 +137,10 @@ export default function AdminJadwal() {
                       {e.status}
                     </span>
                   </div>
-                  <div className="text-[#787583] text-[11px] flex flex-col gap-0.5">
-                    <span>📍 {e.room}</span>
-                    <span>⏰ {e.time} WIB</span>
-                    <span>👤 {e.requester}</span>
+                  <div className="text-[#787583] text-[11px] flex flex-col gap-1 mt-1">
+                    <span className="inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-[#4b3f9e]" /> {e.room}</span>
+                    <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#4b3f9e]" /> {e.time} WIB</span>
+                    <span className="inline-flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-[#4b3f9e]" /> {e.requester}</span>
                   </div>
                 </div>
               ))

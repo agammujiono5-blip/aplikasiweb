@@ -271,6 +271,13 @@ export const api = {
       const json = await res.json();
       return Array.isArray(json.data) ? json.data : [];
     },
+    async getCampusApproved(): Promise<PeminjamanItem[]> {
+      const res = await fetch(`${API_BASE}/jadwal`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Gagal memuat jadwal kampus');
+      const json = await res.json();
+      const list = Array.isArray(json.raw) ? json.raw : [];
+      return list.filter((item: PeminjamanItem) => item.status === 'disetujui');
+    },
     async submitUser(data: {
       nama_kegiatan: string;
       organisasi: string;
