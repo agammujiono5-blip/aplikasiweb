@@ -1,29 +1,70 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface LoadingScreenProps {
   onComplete: () => void;
+  isReady?: boolean;
 }
 
-export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
+export default function LoadingScreen({ onComplete, isReady = false }: LoadingScreenProps) {
   const [progress, setProgress] = useState(0);
   const [fadeOut, setFadeOut] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const isReadyRef = useRef(isReady);
+  isReadyRef.current = isReady;
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
+        // If auth is already ready, advance quickly towards 100%
+        if (isReadyRef.current) {
+          if (prev >= 100) {
+            clearInterval(timer);
             setFadeOut(true);
-            setTimeout(onComplete, 500);
-          }, 300);
-          return 100;
+            setTimeout(() => onCompleteRef.current(), 300);
+            return 100;
+          }
+          return Math.min(100, prev + 10);
         }
-        return prev + 2;
+
+        // If auth is still validating, smoothly advance up to 90% and wait
+        if (prev < 90) {
+          return prev + 3;
+        }
+        return 90;
       });
-    }, 35);
-    return () => clearInterval(interval);
-  }, [onComplete]);
+    }, 30);
+
+    // Safety timeout: in case network never resolves, force complete after 4 seconds
+    const safetyTimeout = setTimeout(() => {
+      setProgress(100);
+      setFadeOut(true);
+      setTimeout(() => onCompleteRef.current(), 300);
+    }, 4000);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(safetyTimeout);
+    };
+  }, []);
+
+  // When isReady flips to true from outside, immediately accelerate progress to 100%
+  useEffect(() => {
+    if (isReady && progress < 100) {
+      const fastInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(fastInterval);
+            setFadeOut(true);
+            setTimeout(() => onCompleteRef.current(), 300);
+            return 100;
+          }
+          return Math.min(100, prev + 15);
+        });
+      }, 25);
+      return () => clearInterval(fastInterval);
+    }
+  }, [isReady]);
 
   return (
     <div

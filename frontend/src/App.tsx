@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import LoadingScreen from './pages/LoadingScreen';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
@@ -26,14 +26,45 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 type Screen = 'loading' | 'login' | 'admin-login' | 'register' | 'forgot-password' | 'reset-password' | 'app';
 
+function getRouteInfo(path: string): { screen: Screen; role: Role; page: ActivePage } {
+  if (path === '/login' || path === '/' || path === '') {
+    return { screen: 'login', role: 'penyewa', page: 'beranda' };
+  }
+  if (path === '/admin/login') {
+    return { screen: 'admin-login', role: 'admin', page: 'beranda' };
+  }
+  if (path === '/register') {
+    return { screen: 'register', role: 'penyewa', page: 'beranda' };
+  }
+  if (path === '/forgot-password') {
+    return { screen: 'forgot-password', role: 'penyewa', page: 'beranda' };
+  }
+  if (path === '/reset-password') {
+    return { screen: 'reset-password', role: 'penyewa', page: 'beranda' };
+  }
+  if (path.startsWith('/admin')) {
+    let page: ActivePage = 'beranda';
+    if (path.includes('/pengajuan')) page = 'pengajuan';
+    else if (path.includes('/ruangan')) page = 'ruangan';
+    else if (path.includes('/jadwal')) page = 'jadwal';
+    else if (path.includes('/pengguna')) page = 'pengguna';
+    else if (path.includes('/log-aktivitas')) page = 'log-aktivitas';
+    return { screen: 'app', role: 'admin', page };
+  }
+  let page: ActivePage = 'beranda';
+  if (path.includes('/ajukan')) page = 'ajukan';
+  else if (path.includes('/riwayat')) page = 'riwayat';
+  else if (path.includes('/jadwal')) page = 'jadwal';
+  else if (path.includes('/profil')) page = 'profil';
+  return { screen: 'app', role: 'penyewa', page };
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('loading');
   const [role, setRole] = useState<Role>('penyewa');
   const [activePage, setActivePage] = useState<ActivePage>('beranda');
-
-  // Track async validation and loading screen state
-  const authResolvedRef = useRef<{ screen: Screen; role: Role } | null>(null);
-  const loadingScreenDoneRef = useRef(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const targetRouteRef = useRef<{ screen: Screen; role: Role; page: ActivePage } | null>(null);
 
   const navigateTo = (path: string, nextScreen: Screen) => {
     if (window.location.pathname !== path) {
@@ -42,56 +73,29 @@ export default function App() {
     setScreen(nextScreen);
   };
 
-  const applyResolvedAuth = (targetScreen: Screen, targetRole: Role) => {
-    authResolvedRef.current = { screen: targetScreen, role: targetRole };
-    if (loadingScreenDoneRef.current) {
-      setRole(targetRole);
-      setScreen(targetScreen);
-    }
-  };
-
   // Route & Session validation on mount
   useEffect(() => {
     const validateSession = async () => {
       const initialPath = window.location.pathname;
+      const routeInfo = getRouteInfo(initialPath);
+      targetRouteRef.current = routeInfo;
 
-      // Public routes
-      if (initialPath === '/login' || initialPath === '/' || initialPath === '') {
-        if (initialPath !== '/login') window.history.replaceState({}, '', '/login');
-        applyResolvedAuth('login', 'penyewa');
+      // Public routes: no backend auth needed to resolve
+      if (routeInfo.screen !== 'app') {
+        if (initialPath === '/' || initialPath === '') {
+          window.history.replaceState({}, '', '/login');
+        }
+        setIsAuthReady(true);
         return;
       }
 
-      if (initialPath === '/admin/login') {
-        applyResolvedAuth('admin-login', 'admin');
-        return;
-      }
-
-      if (initialPath === '/register') {
-        applyResolvedAuth('register', 'penyewa');
-        return;
-      }
-
-      if (initialPath === '/forgot-password') {
-        applyResolvedAuth('forgot-password', 'penyewa');
-        return;
-      }
-
-      if (initialPath === '/reset-password') {
-        applyResolvedAuth('reset-password', 'penyewa');
-        return;
-      }
-
-      // Dashboard routes — check token
-      const isAdminRoute = initialPath.startsWith('/admin');
-
-      const adminToken = localStorage.getItem('admin_auth_token') || (localStorage.getItem('user_role') === 'admin' ? localStorage.getItem('auth_token') : null);
-      const userToken = localStorage.getItem('user_auth_token') || (localStorage.getItem('user_role') === 'penyewa' ? localStorage.getItem('auth_token') : null);
-
-      if (isAdminRoute) {
+      // Admin route authentication
+      if (routeInfo.role === 'admin') {
+        const adminToken = localStorage.getItem('admin_auth_token') || (localStorage.getItem('user_role') === 'admin' ? localStorage.getItem('auth_token') : null);
         if (!adminToken) {
           window.history.replaceState({}, '', '/admin/login');
-          applyResolvedAuth('admin-login', 'admin');
+          targetRouteRef.current = { screen: 'admin-login', role: 'admin', page: 'beranda' };
+          setIsAuthReady(true);
           return;
         }
 
@@ -106,7 +110,8 @@ export default function App() {
             if (data.user) {
               localStorage.setItem('admin_user_data', JSON.stringify(data.user));
             }
-            applyResolvedAuth('app', 'admin');
+            targetRouteRef.current = { screen: 'app', role: 'admin', page: routeInfo.page };
+            setIsAuthReady(true);
             return;
           }
         } catch (err) {
@@ -116,14 +121,17 @@ export default function App() {
         localStorage.removeItem('admin_auth_token');
         localStorage.removeItem('admin_user_data');
         window.history.replaceState({}, '', '/admin/login');
-        applyResolvedAuth('admin-login', 'admin');
+        targetRouteRef.current = { screen: 'admin-login', role: 'admin', page: 'beranda' };
+        setIsAuthReady(true);
         return;
       }
 
-      // User / Penyewa route
+      // User / Penyewa route authentication
+      const userToken = localStorage.getItem('user_auth_token') || (localStorage.getItem('user_role') === 'penyewa' ? localStorage.getItem('auth_token') : null);
       if (!userToken) {
         window.history.replaceState({}, '', '/login');
-        applyResolvedAuth('login', 'penyewa');
+        targetRouteRef.current = { screen: 'login', role: 'penyewa', page: 'beranda' };
+        setIsAuthReady(true);
         return;
       }
 
@@ -138,7 +146,8 @@ export default function App() {
           if (data.user) {
             localStorage.setItem('user_data', JSON.stringify(data.user));
           }
-          applyResolvedAuth('app', 'penyewa');
+          targetRouteRef.current = { screen: 'app', role: 'penyewa', page: routeInfo.page };
+          setIsAuthReady(true);
           return;
         }
       } catch (err) {
@@ -148,40 +157,52 @@ export default function App() {
       localStorage.removeItem('user_auth_token');
       localStorage.removeItem('user_data');
       window.history.replaceState({}, '', '/login');
-      applyResolvedAuth('login', 'penyewa');
+      targetRouteRef.current = { screen: 'login', role: 'penyewa', page: 'beranda' };
+      setIsAuthReady(true);
     };
 
     validateSession();
   }, []);
 
-  const handleLoadingComplete = () => {
-    loadingScreenDoneRef.current = true;
-    if (authResolvedRef.current) {
-      setRole(authResolvedRef.current.role);
-      setScreen(authResolvedRef.current.screen);
+  const handleLoadingComplete = useCallback(() => {
+    if (targetRouteRef.current) {
+      setRole(targetRouteRef.current.role);
+      setActivePage(targetRouteRef.current.page);
+      setScreen(targetRouteRef.current.screen);
+    } else {
+      setScreen('login');
     }
-  };
+  }, []);
 
   // Browser back/forward navigation
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
+      const routeInfo = getRouteInfo(path);
+      if (routeInfo.screen !== 'app') {
+        setScreen(routeInfo.screen);
+        setRole(routeInfo.role);
+        return;
+      }
 
-      if (path === '/admin/login') setScreen('admin-login');
-      else if (path === '/register') setScreen('register');
-      else if (path === '/forgot-password') setScreen('forgot-password');
-      else if (path === '/reset-password') setScreen('reset-password');
-      else if (path === '/login' || path === '/') setScreen('login');
-      else if (path.startsWith('/admin')) {
+      if (routeInfo.role === 'admin') {
         const adminTok = localStorage.getItem('admin_auth_token') || localStorage.getItem('auth_token');
-        if (adminTok) { setRole('admin'); setScreen('app'); }
-        else setScreen('admin-login');
-      } else if (path === '/dashboard') {
-        const userTok = localStorage.getItem('user_auth_token') || localStorage.getItem('auth_token');
-        if (userTok) { setRole('penyewa'); setScreen('app'); }
-        else setScreen('login');
+        if (adminTok) {
+          setRole('admin');
+          setActivePage(routeInfo.page);
+          setScreen('app');
+        } else {
+          setScreen('admin-login');
+        }
       } else {
-        setScreen('login');
+        const userTok = localStorage.getItem('user_auth_token') || localStorage.getItem('auth_token');
+        if (userTok) {
+          setRole('penyewa');
+          setActivePage(routeInfo.page);
+          setScreen('app');
+        } else {
+          setScreen('login');
+        }
       }
     };
 
@@ -192,7 +213,8 @@ export default function App() {
   const handleLogin = (r: Role) => {
     setRole(r);
     setActivePage('beranda');
-    navigateTo(r === 'admin' ? '/admin/dashboard' : '/dashboard', 'app');
+    const path = r === 'admin' ? '/admin/dashboard' : '/dashboard';
+    navigateTo(path, 'app');
   };
 
   const handleLogout = async () => {
@@ -236,10 +258,17 @@ export default function App() {
   };
 
   const handleNavigate = (page: string) => {
-    setActivePage(page as ActivePage);
+    const p = page as ActivePage;
+    setActivePage(p);
+    const newPath = role === 'admin'
+      ? (p === 'beranda' ? '/admin/dashboard' : `/admin/${p}`)
+      : (p === 'beranda' ? '/dashboard' : `/${p}`);
+    if (window.location.pathname !== newPath) {
+      window.history.pushState({}, '', newPath);
+    }
   };
 
-  if (screen === 'loading') return <LoadingScreen onComplete={handleLoadingComplete} />;
+  if (screen === 'loading') return <LoadingScreen onComplete={handleLoadingComplete} isReady={isAuthReady} />;
   if (screen === 'forgot-password') return <ForgotPasswordPage onNavigateLogin={() => navigateTo('/login', 'login')} />;
   if (screen === 'reset-password') return <ResetPasswordPage onNavigateLogin={() => navigateTo('/login', 'login')} />;
   if (screen === 'register') return <RegisterPage onNavigateLogin={() => navigateTo('/login', 'login')} onRegisterSuccess={handleLogin} />;
