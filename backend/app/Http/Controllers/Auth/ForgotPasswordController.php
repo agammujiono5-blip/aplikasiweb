@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -42,16 +43,37 @@ class ForgotPasswordController extends Controller
 
         $resetUrl = config('app.frontend_url', 'http://localhost:5173') . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
 
-        Mail::to($user->email)->send(new ForgotPasswordMail(
-            userName: $user->name,
-            resetToken: $token,
-            resetUrl: $resetUrl,
-        ));
+        $mailSent = false;
+        $mailError = null;
 
-        return response()->json([
+        try {
+            Mail::to($user->email)->send(new ForgotPasswordMail(
+                userName: $user->name,
+                resetToken: $token,
+                resetUrl: $resetUrl,
+            ));
+            $mailSent = true;
+        } catch (\Throwable $e) {
+            Log::error('ForgotPasswordController: Gagal mengirim email reset password: ' . $e->getMessage());
+            $mailError = $e->getMessage();
+        }
+
+        $response = [
             'status' => 'success',
             'message' => 'Jika email terdaftar, link reset password telah dikirim. Periksa inbox Anda.',
-        ]);
+        ];
+
+        // Sertakan debug info jika dalam mode development atau mailer log
+        if (config('app.debug') || config('mail.default') === 'log') {
+            $response['debug'] = [
+                'mailer' => config('mail.default'),
+                'mail_sent' => $mailSent,
+                'reset_url' => $resetUrl,
+                'error' => $mailError,
+            ];
+        }
+
+        return response()->json($response);
     }
 
     /**

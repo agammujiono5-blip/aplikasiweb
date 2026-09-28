@@ -471,13 +471,25 @@ export const api = {
 
   // Auth extras
   auth: {
-    async forgotPassword(email: string): Promise<{ status: string; message: string }> {
+    async forgotPassword(email: string): Promise<{
+      status: string;
+      message: string;
+      debug?: {
+        mailer?: string;
+        mail_sent?: boolean;
+        reset_url?: string;
+        error?: string | null;
+      };
+    }> {
       const res = await fetch(`${API_BASE}/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ email }),
       });
       const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message || 'Gagal mengirim permintaan');
+      }
       return json;
     },
     async resetPassword(email: string, token: string, password: string, password_confirmation: string): Promise<{ status: string; message: string }> {

@@ -10,6 +10,7 @@ export default function ForgotPasswordPage({ onNavigateLogin }: ForgotPasswordPa
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState<{ mailer?: string; reset_url?: string; mail_sent?: boolean; error?: string | null } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,10 +18,14 @@ export default function ForgotPasswordPage({ onNavigateLogin }: ForgotPasswordPa
     setError('');
     setLoading(true);
     try {
-      await api.auth.forgotPassword(email);
+      const res = await api.auth.forgotPassword(email);
+      if (res.debug) {
+        setDebugInfo(res.debug);
+      }
       setSent(true);
-    } catch {
-      setError('Gagal mengirim permintaan. Coba lagi.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal mengirim permintaan. Coba lagi.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -65,10 +70,28 @@ export default function ForgotPasswordPage({ onNavigateLogin }: ForgotPasswordPa
         {sent ? (
           <div className="text-center">
             <div className="text-4xl mb-3">📧</div>
-            <p className="text-white text-[15px] font-semibold mb-2">Email Terkirim!</p>
-            <p className="text-white/80 text-[13px] leading-relaxed mb-6">
-              Jika email <strong>{email}</strong> terdaftar, link reset password telah dikirim. Periksa inbox Anda (dan folder spam).
+            <p className="text-white text-[15px] font-semibold mb-2">Permintaan Terkirim!</p>
+            <p className="text-white/80 text-[13px] leading-relaxed mb-4">
+              Jika email <strong>{email}</strong> terdaftar, instruksi dan link reset password telah diproses. Periksa folder <strong>Inbox</strong> atau <strong>Spam</strong> email Anda.
             </p>
+
+            {debugInfo?.reset_url && (
+              <div className="bg-amber-500/20 border border-amber-400/40 rounded-2xl p-4 text-left mb-5">
+                <div className="flex items-center gap-2 mb-1.5 text-amber-300 font-semibold text-[13px]">
+                  <span>⚡</span> Link Reset Langsung (Mode {debugInfo.mailer || 'Pengujian'})
+                </div>
+                <p className="text-white/80 text-[12px] leading-relaxed mb-3">
+                  Driver email server saat ini: <code className="bg-black/30 px-1 py-0.5 rounded text-amber-200">{debugInfo.mailer}</code>. Anda dapat langsung mengklik tombol di bawah untuk mereset password:
+                </p>
+                <a
+                  href={debugInfo.reset_url}
+                  className="block w-full py-2.5 px-4 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-[13px] rounded-full text-center transition shadow"
+                >
+                  Buka Halaman Reset Password ↗
+                </a>
+              </div>
+            )}
+
             <button
               onClick={onNavigateLogin}
               className="w-full h-[48px] rounded-full bg-white text-[#4b3f9e] font-bold text-[14px] hover:bg-white/90 transition cursor-pointer"

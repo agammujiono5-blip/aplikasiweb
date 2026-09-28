@@ -227,7 +227,7 @@ export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgo
               }}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Forgot Password ?
+              Lupa Password ?
             </a>
 
             {onNavigateRegister ? (
@@ -239,7 +239,7 @@ export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgo
                 }}
                 className="hover:text-white font-normal transition-colors cursor-pointer"
               >
-                Sign Up
+                Registrasi
               </a>
             ) : (
               <span className="hover:text-white transition-colors cursor-pointer">Sign Up</span>
