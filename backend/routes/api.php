@@ -35,6 +35,7 @@ Route::middleware(['auth:sanctum', 'auth.user'])->prefix('user')->group(function
     Route::get('/peminjaman', [PeminjamanController::class, 'indexUser'])->name('api.user.peminjaman.index');
     Route::post('/peminjaman', [PeminjamanController::class, 'storeUser'])->name('api.user.peminjaman.store');
     Route::patch('/peminjaman/{id}/cancel', [PeminjamanController::class, 'cancelUser'])->name('api.user.peminjaman.cancel');
+    Route::put('/peminjaman/{id}', [PeminjamanController::class, 'updateUser'])->name('api.user.peminjaman.update');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('api.user.notifications.index');

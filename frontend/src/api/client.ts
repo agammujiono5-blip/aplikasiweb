@@ -339,6 +339,68 @@ export const api = {
       broadcastUpdate();
       return await res.json();
     },
+    async updateUser(id: number, data: {
+      nama_kegiatan: string;
+      organisasi: string;
+      jenis_kegiatan?: string;
+      room_id: number;
+      tanggal: string;
+      jam_mulai: string;
+      jam_selesai: string;
+      estimasi_peserta: number;
+      keperluan?: string;
+      fasilitas?: string[];
+      catatan?: string;
+      berkas?: File | null;
+    }) {
+      let body: BodyInit;
+      let headers: Record<string, string>;
+
+      if (data.berkas) {
+        const formData = new FormData();
+        formData.append('_method', 'PUT');
+        Object.entries(data).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) {
+            if (k === 'fasilitas' && Array.isArray(v)) {
+              formData.append(k, JSON.stringify(v));
+            } else if (k === 'berkas' && v instanceof File) {
+              formData.append('berkas', v);
+            } else {
+              formData.append(k, String(v));
+            }
+          }
+        });
+        body = formData;
+        headers = getAuthHeaders(true, 'user');
+        // Laravel requires POST with _method=PUT for FormData file uploads
+        const res = await fetch(`${API_BASE}/user/peminjaman/${id}`, {
+          method: 'POST',
+          headers,
+          body,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || 'Gagal memperbarui pengajuan');
+        }
+        broadcastUpdate();
+        return await res.json();
+      } else {
+        const { berkas, ...jsonData } = data;
+        body = JSON.stringify(jsonData);
+        headers = getAuthHeaders(false, 'user');
+        const res = await fetch(`${API_BASE}/user/peminjaman/${id}`, {
+          method: 'PUT',
+          headers,
+          body,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || 'Gagal memperbarui pengajuan');
+        }
+        broadcastUpdate();
+        return await res.json();
+      }
+    },
     async getUserStats(): Promise<UserStatsData> {
       const res = await fetch(`${API_BASE}/user/stats`, { headers: getAuthHeaders(false, 'user') });
       if (!res.ok) throw new Error('Gagal memuat statistik pengguna');

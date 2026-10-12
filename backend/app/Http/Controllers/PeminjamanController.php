@@ -197,6 +197,109 @@ class PeminjamanController extends Controller
     }
 
     /**
+     * Update an existing loan application by Penyewa (only if status is 'menunggu').
+     */
+    public function updateUser(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $peminjaman = Peminjaman::where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        if ($peminjaman->status !== 'menunggu') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pengajuan yang sudah diproses tidak dapat diubah.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'nama_kegiatan' => 'required|string|max:255',
+            'organisasi' => 'required|string|max:255',
+            'jenis_kegiatan' => 'nullable|string|max:255',
+            'room_id' => 'required|exists:rooms,id',
+            'tanggal' => 'required|date',
+            'jam_mulai' => 'required|string|max:10',
+            'jam_selesai' => 'required|string|max:10',
+            'estimasi_peserta' => 'required|integer|min:1',
+            'keperluan' => 'nullable|string',
+            'fasilitas' => 'nullable',
+            'catatan' => 'nullable|string',
+            'berkas' => 'nullable|file|mimes:pdf,doc,docx|max:10240',
+        ]);
+
+        if (isset($validated['fasilitas'])) {
+            if (is_string($validated['fasilitas'])) {
+                $decoded = json_decode($validated['fasilitas'], true);
+                $validated['fasilitas'] = is_array($decoded) ? $decoded : [];
+            }
+        } else {
+            $validated['fasilitas'] = $peminjaman->fasilitas ?? [];
+        }
+
+        // Check for room schedule conflict, excluding the current peminjaman
+        $conflict = Peminjaman::where('room_id', $validated['room_id'])
+            ->where('tanggal', $validated['tanggal'])
+            ->whereIn('status', ['menunggu', 'disetujui'])
+            ->where('id', '!=', $peminjaman->id)
+            ->where(function ($query) use ($validated) {
+                $query->where('jam_mulai', '<', $validated['jam_selesai'])
+                      ->where('jam_selesai', '>', $validated['jam_mulai']);
+            })
+            ->first();
+
+        if ($conflict) {
+            $room = Room::find($validated['room_id']);
+            $roomName = $room ? $room->name : 'Ruangan ini';
+            $statusText = $conflict->status === 'disetujui' ? 'telah disetujui untuk' : 'sedang diajukan untuk';
+            return response()->json([
+                'status' => 'error',
+                'message' => "Jadwal bentrok: {$roomName} {$statusText} kegiatan \"{$conflict->nama_kegiatan}\" pada tanggal {$validated['tanggal']} pukul {$conflict->jam_mulai} - {$conflict->jam_selesai}. Silakan pilih jam atau ruangan lain.",
+            ], 422);
+        }
+
+        // Handle file attachment update
+        if ($request->hasFile('berkas')) {
+            $file = $request->file('berkas');
+            $path = $file->store('berkas_peminjaman', 'public');
+            $validated['berkas_path'] = $path;
+            $validated['berkas_url'] = url('storage/' . $path);
+            $validated['berkas_name'] = $file->getClientOriginalName();
+        }
+
+        // Update room_id change: adjust peminjaman_count
+        if ($peminjaman->room_id != $validated['room_id']) {
+            Room::where('id', $peminjaman->room_id)->decrement('peminjaman_count');
+            Room::where('id', $validated['room_id'])->increment('peminjaman_count');
+        }
+
+        $peminjaman->update($validated);
+        $peminjaman->load('room');
+
+        // Log activity
+        ActivityLog::create([
+            'admin_id'     => null,
+            'action'       => 'update_pengajuan',
+            'description'  => "Penyewa {$user->name} mengubah data pengajuan {$peminjaman->ticket_number}: {$peminjaman->nama_kegiatan}",
+            'subject_type' => 'Peminjaman',
+            'subject_id'   => $peminjaman->id,
+            'meta'         => [
+                'ticket_number' => $peminjaman->ticket_number,
+                'user_name'     => $user->name,
+                'room_name'     => $peminjaman->room?->name,
+            ],
+        ]);
+
+        self::flushPeminjamanCache();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data pengajuan peminjaman berhasil diperbarui.',
+            'data' => $peminjaman,
+        ]);
+    }
+
+    /**
      * Live stats for Penyewa dashboard.
      * High-speed versioned cache for zero-delay response.
      */
