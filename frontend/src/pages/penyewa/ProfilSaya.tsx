@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, useLiveQuery, broadcastUpdate } from '../../api/client';
 import type { UserProfileData } from '../../api/client';
 
@@ -26,6 +26,7 @@ const getInitialProfile = (): UserProfileData => {
           jabatan: u.jabatan || '',
           alamat: u.alamat || '',
           bio: u.bio || '',
+          foto_url: u.foto_url || '',
           is_active: u.is_active ?? true,
         };
       }
@@ -47,6 +48,7 @@ const getInitialProfile = (): UserProfileData => {
     jabatan: '',
     alamat: '',
     bio: '',
+    foto_url: '',
     is_active: true,
   };
 };
@@ -61,6 +63,8 @@ export default function ProfilSaya({ onLogout }: ProfilProps) {
   const [pass, setPass] = useState({ lama: '', baru: '', konfirmasi: '' });
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingFoto, setIsUploadingFoto] = useState(false);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
 
   const [prevDbProfile, setPrevDbProfile] = useState(dbProfile);
 
@@ -135,6 +139,69 @@ export default function ProfilSaya({ onLogout }: ProfilProps) {
     }
   };
 
+  const handleFotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+    if (!isPng) {
+      setMsg({ text: 'Format foto harus PNG. Silakan pilih file dengan ekstensi .png', error: true });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMsg({ text: 'Ukuran foto maksimal 5 MB.', error: true });
+      return;
+    }
+
+    setIsUploadingFoto(true);
+    setMsg(null);
+    try {
+      const res = await api.users.uploadFoto(file);
+      const fotoUrl: string = res.data?.foto_url || '';
+      setProfile(p => ({ ...p, foto_url: fotoUrl }));
+      setTemp(p => ({ ...p, foto_url: fotoUrl }));
+
+      const stored = localStorage.getItem('user_data');
+      if (stored) {
+        const u = JSON.parse(stored);
+        localStorage.setItem('user_data', JSON.stringify({ ...u, foto_url: fotoUrl }));
+      }
+
+      broadcastUpdate();
+      setMsg({ text: 'Foto profil (PNG) berhasil diperbarui!' });
+      await refetch();
+    } catch (err) {
+      setMsg({ text: err instanceof Error ? err.message : String(err), error: true });
+    } finally {
+      setIsUploadingFoto(false);
+    }
+  };
+
+  const handleHapusFoto = async () => {
+    setIsUploadingFoto(true);
+    setMsg(null);
+    try {
+      await api.users.deleteFoto();
+      setProfile(p => ({ ...p, foto_url: '' }));
+      setTemp(p => ({ ...p, foto_url: '' }));
+
+      const stored = localStorage.getItem('user_data');
+      if (stored) {
+        const u = JSON.parse(stored);
+        localStorage.setItem('user_data', JSON.stringify({ ...u, foto_url: '' }));
+      }
+
+      broadcastUpdate();
+      setMsg({ text: 'Foto profil berhasil dihapus.' });
+      await refetch();
+    } catch (err) {
+      setMsg({ text: err instanceof Error ? err.message : String(err), error: true });
+    } finally {
+      setIsUploadingFoto(false);
+    }
+  };
+
   const initials = profile.nama
     ? profile.nama.split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase()
     : 'M';
@@ -171,8 +238,58 @@ export default function ProfilSaya({ onLogout }: ProfilProps) {
 
       {/* Hero Profile Card */}
       <div className="bg-white border border-[rgba(201,196,212,0.5)] rounded-[16px] p-6 lg:p-8 shadow-sm flex flex-col sm:flex-row items-center sm:items-start gap-6">
-        <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#ece9fe] to-[#c7c4d4] flex items-center justify-center text-[#4b3f9e] text-[32px] font-bold shrink-0 shadow-inner">
-          {initials}
+        <div className="flex flex-col items-center gap-2 shrink-0">
+          <input
+            ref={fotoInputRef}
+            type="file"
+            accept="image/png,.png"
+            onChange={handleFotoChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fotoInputRef.current?.click()}
+            disabled={isUploadingFoto}
+            title="Ganti foto profil (PNG)"
+            className="group relative w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-[#ece9fe] to-[#c7c4d4] flex items-center justify-center text-[#4b3f9e] text-[32px] font-bold shadow-inner cursor-pointer disabled:cursor-wait"
+          >
+            {profile.foto_url ? (
+              <img src={profile.foto_url} alt={`Foto ${profile.nama}`} className="w-full h-full object-cover" />
+            ) : (
+              initials
+            )}
+            <span className="absolute inset-0 bg-black/45 text-white text-[11px] font-semibold flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploadingFoto ? (
+                <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  Ganti Foto
+                </>
+              )}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fotoInputRef.current?.click()}
+            disabled={isUploadingFoto}
+            className="text-[11px] font-semibold text-[#4b3f9e] hover:text-[#342586] hover:underline cursor-pointer disabled:opacity-50"
+          >
+            {isUploadingFoto ? 'Mengunggah...' : 'Unggah Foto Profil anda'}
+          </button>
+          {profile.foto_url && (
+            <button
+              type="button"
+              onClick={handleHapusFoto}
+              disabled={isUploadingFoto}
+              className="text-[11px] font-medium text-[#ba1a1a] hover:underline cursor-pointer disabled:opacity-50"
+            >
+              Hapus Foto
+            </button>
+          )}
         </div>
         <div className="flex-1 text-center sm:text-left flex flex-col gap-1.5 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

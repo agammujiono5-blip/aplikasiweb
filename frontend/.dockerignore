@@ -1,5 +1,14 @@
+# Konteks build image frontend.
 .git
 node_modules
 dist
+dist-ssr
+
+# Environment (RAHASIA). Konfigurasi production di-inject lewat build ARG.
 .env
 .env.*
+!.env.development
+
+e2e
+.DS_Store
+*.log

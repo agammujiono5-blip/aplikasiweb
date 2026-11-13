@@ -19,6 +19,7 @@
 @theme inline {
   --color-primary: #4b3f9e;
   --color-primary-dark: #342586;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
 }
 
 * {

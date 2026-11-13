@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Role } from '../components/Layout';
+import { API_BASE } from '../api/base-url';
 
 interface RegisterPageProps {
   onNavigateLogin: () => void;
@@ -54,7 +55,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/register', {
+      const response = await fetch(`${API_BASE}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,7 +94,7 @@ export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: Reg
         onRegisterSuccess('penyewa');
       }, 1200);
     } catch {
-      setError('Gagal terhubung ke server backend (http://localhost:8000). Pastikan backend aktif.');
+      setError('Gagal terhubung ke server backend. Pastikan backend aktif.');
     } finally {
       setLoading(false);
     }

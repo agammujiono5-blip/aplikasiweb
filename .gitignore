@@ -1,4 +1,4 @@
-# Environment
+# Deployment & Docker
 .env
 .env.*
 !.env.example
@@ -16,6 +16,11 @@ storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/views/*
+*.phpunit.result.cache
+backend/.phpunit.result.cache
+backend/public/hot
+# Symlink `php artisan storage:link` (dibuat per lingkungan)
+backend/public/storage
 
 # Docker
 *.log

@@ -170,4 +170,43 @@ class PeminjamanConflictAndUploadTest extends TestCase
             'jabatan' => 'Ketua Umum',
         ]);
     }
+
+    public function test_user_can_upload_and_delete_png_profile_photo(): void
+    {
+        Sanctum::actingAs($this->user, ['user']);
+
+        $png = UploadedFile::fake()->image('foto.png', 200, 200)->mimeType('image/png');
+
+        $uploadRes = $this->postJson('/api/user/profile/foto', ['foto' => $png]);
+
+        $uploadRes->assertStatus(200)
+            ->assertJsonPath('status', 'success');
+
+        $fotoUrl = $uploadRes->json('data.foto_url');
+        $this->assertNotEmpty($fotoUrl);
+
+        $this->user->refresh();
+        $this->assertNotNull($this->user->foto_path);
+        Storage::disk('public')->assertExists($this->user->foto_path);
+        $this->assertSame($fotoUrl, $this->getJson('/api/user/profile')->json('data.foto_url'));
+
+        $deleteRes = $this->deleteJson('/api/user/profile/foto');
+        $deleteRes->assertStatus(200)->assertJsonPath('data.foto_url', '');
+
+        $this->user->refresh();
+        $this->assertNull($this->user->foto_path);
+    }
+
+    public function test_profile_photo_must_be_png(): void
+    {
+        Sanctum::actingAs($this->user, ['user']);
+
+        $jpg = UploadedFile::fake()->image('foto.jpg', 200, 200)->mimeType('image/jpeg');
+
+        $this->postJson('/api/user/profile/foto', ['foto' => $jpg])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('foto');
+
+        $this->assertNull($this->user->fresh()->foto_path);
+    }
 }

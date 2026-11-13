@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
@@ -95,6 +96,7 @@ class UserController extends Controller
                 'jabatan' => $user->jabatan ?? '',
                 'alamat' => $user->alamat ?? '',
                 'bio' => $user->bio ?? '',
+                'foto_url' => $user->foto_url ?? '',
                 'is_active' => $user->is_active,
             ],
         ]);
@@ -192,7 +194,76 @@ class UserController extends Controller
                 'jabatan' => $user->jabatan ?? '',
                 'alamat' => $user->alamat ?? '',
                 'bio' => $user->bio ?? '',
+                'foto_url' => $user->foto_url ?? '',
                 'is_active' => $user->is_active,
+            ],
+        ]);
+    }
+
+    /**
+     * Upload / replace profile photo (PNG only).
+     */
+    public function uploadFoto(Request $request): JsonResponse
+    {
+        $request->validate([
+            'foto' => 'required|file|mimes:png|max:5120',
+        ], [
+            'foto.required' => 'Pilih file foto terlebih dahulu.',
+            'foto.mimes' => 'Format foto harus PNG.',
+            'foto.max' => 'Ukuran foto maksimal 5 MB.',
+        ]);
+
+        $user = $request->user();
+        $file = $request->file('foto');
+
+        // Verify the real image type as well, not only the extension/mime header
+        if (strtolower($file->extension()) !== 'png' || @getimagesize($file->getRealPath())['mime'] !== 'image/png') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Format foto harus PNG.',
+            ], 422);
+        }
+
+        $oldPath = $user->foto_path;
+        $path = $file->store('foto_profil', 'public');
+
+        $user->foto_path = $path;
+        $user->foto_url = url('storage/' . $path) . '?v=' . time();
+        $user->save();
+
+        if ($oldPath && $oldPath !== $path) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Foto profil berhasil diperbarui.',
+            'data' => [
+                'foto_url' => $user->foto_url,
+            ],
+        ]);
+    }
+
+    /**
+     * Remove profile photo.
+     */
+    public function deleteFoto(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->foto_path) {
+            Storage::disk('public')->delete($user->foto_path);
+        }
+
+        $user->foto_path = null;
+        $user->foto_url = null;
+        $user->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Foto profil berhasil dihapus.',
+            'data' => [
+                'foto_url' => '',
             ],
         ]);
     }

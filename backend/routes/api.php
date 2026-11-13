@@ -11,13 +11,14 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Public Authentication
-Route::post('/register', [UserAuthController::class, 'register'])->name('api.user.register');
-Route::post('/login', [UserAuthController::class, 'login'])->name('api.user.login');
-Route::post('/admin/login', [AdminAuthController::class, 'login'])->name('api.admin.login');
+// Throttle ringan sebagai lapisan kedua; limiter per-akun tetap di LoginRateLimiter.
+Route::post('/register', [UserAuthController::class, 'register'])->middleware('throttle:20,1')->name('api.user.register');
+Route::post('/login', [UserAuthController::class, 'login'])->middleware('throttle:20,1')->name('api.user.login');
+Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('throttle:20,1')->name('api.admin.login');
 
 // Forgot / Reset Password (public)
-Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink'])->name('api.forgot_password');
-Route::post('/reset-password', [ForgotPasswordController::class, 'resetPassword'])->name('api.reset_password');
+Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink'])->middleware('throttle:5,1')->name('api.forgot_password');
+Route::post('/reset-password', [ForgotPasswordController::class, 'resetPassword'])->middleware('throttle:5,1')->name('api.reset_password');
 
 // Shared routes (available for both Penyewa and Admin)
 Route::get('/rooms', [RoomController::class, 'index'])->name('api.rooms.index');
@@ -30,6 +31,8 @@ Route::middleware(['auth:sanctum', 'auth.user'])->prefix('user')->group(function
 
     Route::get('/profile', [UserController::class, 'getProfile'])->name('api.user.profile.get');
     Route::put('/profile', [UserController::class, 'updateProfile'])->name('api.user.profile.update');
+    Route::post('/profile/foto', [UserController::class, 'uploadFoto'])->name('api.user.profile.foto.upload');
+    Route::delete('/profile/foto', [UserController::class, 'deleteFoto'])->name('api.user.profile.foto.delete');
 
     Route::get('/stats', [PeminjamanController::class, 'statsUser'])->name('api.user.stats');
     Route::get('/peminjaman', [PeminjamanController::class, 'indexUser'])->name('api.user.peminjaman.index');

@@ -182,6 +182,7 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
     email?: string;
     petugas_id?: string;
     jabatan?: string;
+    foto_url?: string;
   } | null = role === 'penyewa' ? (liveProfile || storedUser) : storedUser;
 
   const rawName = activeUser?.nama || activeUser?.name;
@@ -301,9 +302,13 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
         {/* User footer */}
         <div className="px-5 py-4 border-t border-[rgba(201,196,212,0.3)] bg-[#fafafc]">
           <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-[14px] shrink-0
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-[14px] shrink-0 overflow-hidden
               ${role === 'admin' ? 'bg-[#fff3cd] text-[#b45309]' : 'bg-[#ece9fe] text-[#4b3f9e]'}`}>
-              {userInitials}
+              {role === 'penyewa' && activeUser?.foto_url ? (
+                <img src={activeUser.foto_url} alt={userName} className="w-full h-full object-cover" />
+              ) : (
+                userInitials
+              )}
             </div>
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-[#111c2d] text-[14px] font-bold truncate leading-tight" title={userName}>{userName}</span>

@@ -1,5 +1,42 @@
+# Konteks build image backend Laravel.
+# Jangan kirim kredensial, data runtime, atau file development ke image.
+
 .git
+.github
+
+# Environment (RAHASIA)
 .env
-vendor
+.env.*
+!.env.example
+
+# Dependensi di-install ulang di stage `vendor`
+/vendor
 node_modules
+
+# Runtime state (dipasang sebagai volume persisten, bukan bagian image)
 storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/app/public/*
+bootstrap/cache/*.php
+.phpunit.result.cache
+
+# Upload lokal & symlink storage beda OS
+public/storage
+public/hot
+
+# Development & tooling
+tests
+phpunit.xml
+.devcontainer
+.idea
+.vscode
+
+# File Docker (tetap terbaca saat COPY, tidak ikut ke image akhir)
+Dockerfile
+.dockerignore
+
+# OS
+.DS_Store
+*.log

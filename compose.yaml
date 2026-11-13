@@ -1,48 +1,144 @@
+# ---------------------------------------------------------------------------
+# SiPinjam Kampus — Docker Compose produksi
+#
+# Arsitektur:
+#   Internet
+#     → Nginx host Ubuntu (port 80/443 + SSL Let's Encrypt)
+#     → Docker (127.0.0.1:8080 = frontend, 127.0.0.1:8081 = backend API)
+#     → Docker network internal (nginx ↔ frontend ↔ backend ↔ redis)
+#     → Supabase PostgreSQL (di luar Docker, koneksi TLS)
+#
+# PENTING:
+#   - Port 80 dan 443 TIDAK dipakai container; keduanya milik Nginx native.
+#   - Port aplikasi hanya dipublish ke loopback (127.0.0.1) sehingga tidak
+#     bisa diakses langsung dari internet. Nginx host adalah pintu masuk.
+#   - Redis tidak dipublish ke host.
+#   - Database = Supabase (eksternal), tidak ada container database.
+#
+# Konfigurasi rahasia ada di ./backend/.env (tidak di-commit).
+# ---------------------------------------------------------------------------
+
 services:
 
-  nginx:
-    image: nginx:alpine
-    container_name: aplikasiweb-nginx
+  # -------------------------------------------------------------------------
+  # Frontend React (build Vite disajikan nginx)
+  # -------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Kosong = same-origin: /api diteruskan nginx host ke backend.
+        VITE_BACKEND_URL: "${VITE_BACKEND_URL:-}"
+        # Kosong = halaman error diambil dari origin yang sama (/errors/...).
+        VITE_ERROR_PAGE_URL: "${VITE_ERROR_PAGE_URL:-}"
+    image: aplikasiweb-frontend:${IMAGE_TAG:-latest}
+    container_name: aplikasiweb-frontend
     restart: unless-stopped
+    # Loopback saja → Nginx host di port 443 meneruskannya.
     ports:
-      - "80:80"
-    volumes:
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - backend
-      - frontend
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
     networks:
-      - aplikasiweb
+      aplikasiweb:
+        aliases:
+          # Dipakai docker/nginx/default.conf (proxy_pass http://frontend:80)
+          - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # -------------------------------------------------------------------------
+  # Redis — cache & session Laravel (REDIS_CLIENT=phpredis).
+  # Tidak ada port yang dipublish.
+  # -------------------------------------------------------------------------
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: aplikasiweb-redis
     restart: unless-stopped
-    command: redis-server /usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     volumes:
       - redis_data:/data
       - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
-      - aplikasiweb
+      aplikasiweb:
+        aliases:
+          # Dipakai Laravel (REDIS_HOST=redis)
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
 
+  # -------------------------------------------------------------------------
+  # Backend Laravel (php-fpm + nginx internal + supervisor)
+  # -------------------------------------------------------------------------
   backend:
     build:
       context: ./backend
+    image: aplikasiweb-backend:${IMAGE_TAG:-latest}
     container_name: aplikasiweb-backend
     restart: unless-stopped
+    env_file:
+      # Kredensial produksi (APP_KEY, DB Supabase, mail, dll).
+      # File ini ada di .gitignore dan hanya dibuat di VPS.
+      # Semua variabel APP_*, LOG_CHANNEL, CACHE_STORE, SESSION_*, dan
+      # FRONTEND_URL ditetapkan di sana (lihat DEPLOYMENT.md).
+      - ./backend/.env
+    environment:
+      # Nilai non-rahasia yang dipaksa oleh Docker network.
+      APP_ENV: production
+      APP_DEBUG: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Migrasi otomatis saat start (default MATI — lihat DEPLOYMENT.md).
+      AUTO_MIGRATE: "${AUTO_MIGRATE:-false}"
+    # Loopback saja. Nginx host (api.webisdepinjam.cloud) meneruskan ke sini.
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8081}:8000"
+    volumes:
+      # Foto profil & berkas peminjaman harus persisten di luar image.
+      - backend_storage:/var/www/html/storage
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
-      - aplikasiweb
-
-  frontend:
-    build:
-      context: ./frontend
-    container_name: aplikasiweb-frontend
-    restart: unless-stopped
-    networks:
-      - aplikasiweb
+      aplikasiweb:
+        aliases:
+          # Dipakai docker/nginx/default.conf (proxy_pass http://backend:8000)
+          - backend
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 networks:
   aplikasiweb:
+    name: aplikasiweb
+    driver: bridge
 
 volumes:
   redis_data:
+    name: aplikasiweb_redis_data
+  backend_storage:
+    name: aplikasiweb_backend_storage

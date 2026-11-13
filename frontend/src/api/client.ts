@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { API_BASE } from './base-url';
 
-export const API_BASE = 'http://localhost:8000/api';
+export { API_BASE };
 
 // Cross-tab real-time sync channel
 const realtimeChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('sipinjam_realtime_sync') : null;
@@ -199,6 +200,7 @@ export interface UserProfileData {
   jabatan?: string;
   alamat?: string;
   bio?: string;
+  foto_url?: string;
   is_active: boolean;
 }
 
@@ -480,6 +482,33 @@ export const api = {
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || 'Gagal memperbarui profil');
+      }
+      broadcastUpdate();
+      return await res.json();
+    },
+    async uploadFoto(file: File) {
+      const formData = new FormData();
+      formData.append('foto', file);
+      const res = await fetch(`${API_BASE}/user/profile/foto`, {
+        method: 'POST',
+        headers: getAuthHeaders(true, 'user'),
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Gagal mengunggah foto profil');
+      }
+      broadcastUpdate();
+      return await res.json();
+    },
+    async deleteFoto() {
+      const res = await fetch(`${API_BASE}/user/profile/foto`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(false, 'user'),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Gagal menghapus foto profil');
       }
       broadcastUpdate();
       return await res.json();

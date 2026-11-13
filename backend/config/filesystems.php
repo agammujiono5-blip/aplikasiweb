@@ -33,7 +33,11 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Route GET/PUT /storage/{path} hanya dibutuhkan untuk file privat
+            // yang ditandatangani. Aplikasi ini menyajikan upload lewat
+            // public/storage (symlink), sehingga dimatikan di production
+            // agar tidak ada endpoint tulis tambahan yang terbuka publik.
+            'serve' => env('FILESYSTEM_SERVE_LOCAL', false),
             'throw' => false,
             'report' => false,
         ],

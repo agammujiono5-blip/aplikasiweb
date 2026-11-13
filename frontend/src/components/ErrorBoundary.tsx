@@ -1,8 +1,12 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react';
+import { openBackendErrorPage } from '../utils/error-page';
 
 interface Props {
   children: ReactNode;
   fallbackTitle?: string;
+  /** Bila true, arahkan ke halaman 500 Laravel alih-alih kartu inline. */
+  fullPage?: boolean;
+  onReport?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
@@ -22,6 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    this.props.onReport?.(error, errorInfo);
   }
 
   public handleReset = () => {
@@ -31,6 +36,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.fullPage) {
+        // Halaman error dirender Laravel (resources/views/errors/500.blade.php).
+        openBackendErrorPage(500);
+        return null;
+      }
       return (
         <div className="p-8 flex flex-col items-center justify-center min-h-[300px] text-center" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl font-bold mb-3">

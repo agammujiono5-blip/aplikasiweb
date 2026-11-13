@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Role } from '../components/Layout';
+import { API_BASE } from '../api/base-url';
 
 interface LoginPageProps {
   onLogin: (role: Role) => void;
@@ -26,7 +27,7 @@ export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgo
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/login', {
+      const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,7 +53,7 @@ export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgo
 
       onLogin('penyewa');
     } catch {
-      setError('Gagal menghubungi backend API (http://localhost:8000). Pastikan server aktif.');
+      setError('Gagal menghubungi backend API. Pastikan server aktif.');
     } finally {
       setLoading(false);
     }

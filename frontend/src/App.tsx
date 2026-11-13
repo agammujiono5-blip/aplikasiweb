@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { API_BASE } from './api/base-url';
 import LoadingScreen from './pages/LoadingScreen';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
@@ -23,8 +24,14 @@ import AdminJadwal from './pages/admin/AdminJadwal';
 import DataPengguna from './pages/admin/DataPengguna';
 import LogAktivitas from './pages/admin/LogAktivitas';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { openBackendErrorPage } from './utils/error-page';
 
 type Screen = 'loading' | 'login' | 'admin-login' | 'register' | 'forgot-password' | 'reset-password' | 'app';
+
+const KNOWN_APP_ROUTES = new Set([
+  '/dashboard', '/ajukan', '/riwayat', '/jadwal', '/profil',
+  '/admin/dashboard', '/admin/pengajuan', '/admin/ruangan', '/admin/jadwal', '/admin/pengguna', '/admin/log-aktivitas',
+]);
 
 function getRouteInfo(path: string): { screen: Screen; role: Role; page: ActivePage } {
   if (path === '/login' || path === '/' || path === '') {
@@ -41,6 +48,11 @@ function getRouteInfo(path: string): { screen: Screen; role: Role; page: ActiveP
   }
   if (path === '/reset-password') {
     return { screen: 'reset-password', role: 'penyewa', page: 'beranda' };
+  }
+  if (!KNOWN_APP_ROUTES.has(path)) {
+    // Halaman error ditangani Laravel (resources/views/errors).
+    openBackendErrorPage(404);
+    return { screen: 'loading', role: 'penyewa', page: 'beranda' };
   }
   if (path.startsWith('/admin')) {
     let page: ActivePage = 'beranda';
@@ -100,7 +112,7 @@ export default function App() {
         }
 
         try {
-          const adminRes = await fetch('http://localhost:8000/api/admin/me', {
+          const adminRes = await fetch(`${API_BASE}/admin/me`, {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${adminToken}`, 'Accept': 'application/json' },
           });
@@ -136,7 +148,7 @@ export default function App() {
       }
 
       try {
-        const userRes = await fetch('http://localhost:8000/api/user/me', {
+        const userRes = await fetch(`${API_BASE}/user/me`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${userToken}`, 'Accept': 'application/json' },
         });
@@ -226,8 +238,8 @@ export default function App() {
     if (token) {
       try {
         const endpoint = currentRole === 'admin'
-          ? 'http://localhost:8000/api/admin/logout'
-          : 'http://localhost:8000/api/user/logout';
+          ? `${API_BASE}/admin/logout`
+          : `${API_BASE}/user/logout`;
         await fetch(endpoint, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
@@ -306,7 +318,7 @@ export default function App() {
 
   return (
     <Layout role={role} activePage={activePage} onNavigate={handleNavigate} onLogout={handleLogout}>
-      <ErrorBoundary key={`${role}-${activePage}`}>
+      <ErrorBoundary key={`${role}-${activePage}`} fullPage>
         {renderPage()}
       </ErrorBoundary>
     </Layout>

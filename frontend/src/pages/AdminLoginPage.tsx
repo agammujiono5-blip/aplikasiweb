@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Role } from '../components/Layout';
+import { API_BASE } from '../api/base-url';
 
 interface AdminLoginPageProps {
   onLogin: (role: Role) => void;
@@ -25,7 +26,7 @@ export default function AdminLoginPage({ onLogin, onNavigateLogin }: AdminLoginP
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/admin/login', {
+      const response = await fetch(`${API_BASE}/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -51,7 +52,7 @@ export default function AdminLoginPage({ onLogin, onNavigateLogin }: AdminLoginP
 
       onLogin('admin');
     } catch {
-      setError('Gagal menghubungi backend API (http://localhost:8000). Pastikan server aktif.');
+      setError('Gagal menghubungi backend API. Pastikan server aktif.');
     } finally {
       setLoading(false);
     }
