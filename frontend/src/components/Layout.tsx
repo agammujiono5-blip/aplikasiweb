@@ -79,8 +79,7 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
     { key: 'profil', label: 'Profil Saya', icon: <IconUser /> },
   ];
 
-  const adminNav: NavItem[] = [
-    { key: 'beranda', label: 'Dashboard', icon: <IconHome /> },
+  const adminNav: NavItem[] = [    { key: 'beranda', label: 'Dashboard', icon: <IconHome /> },
     { key: 'pengajuan', label: 'Kelola Pengajuan', icon: <IconClipboard /> },
     { key: 'ruangan', label: 'Kelola Ruangan', icon: <IconBuilding /> },
     { key: 'jadwal', label: 'Jadwal Ruangan', icon: <IconCalendar /> },
@@ -97,6 +96,14 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
   ];
 
   const navItems = role === 'penyewa' ? penyewaNav : adminNav;
+
+  // Judul tab browser mengikuti halaman aktif.
+  useEffect(() => {
+    const current = navItems.find((item) => item.key === activePage);
+    document.title = current
+      ? `${current.label} — SiPinjam UNY`
+      : 'SiPinjam UNY — Sistem Peminjaman Ruang Kampus';
+  }, [activePage, navItems]);
 
   // Live query for student profile to always stay synchronized with the database
   const { data: liveProfile } = useLiveQuery(
@@ -352,7 +359,7 @@ export default function Layout({ role, activePage, onNavigate, onLogout, childre
             </svg>
           </button>
           <img src="/uny-logo.png" alt="Logo UNY" className="w-7 h-7 object-contain" />
-          <span className="text-[#111c2d] text-[15px] font-bold">SiPinjam Kampus</span>
+          <span className="text-[#111c2d] text-[15px] font-bold">SiPinjam UNY</span>
         </div>
 
         <main className="flex-1 overflow-y-auto w-full">

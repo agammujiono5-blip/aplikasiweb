@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 
 interface ResetPasswordPageProps {
@@ -6,6 +6,11 @@ interface ResetPasswordPageProps {
 }
 
 export default function ResetPasswordPage({ onNavigateLogin }: ResetPasswordPageProps) {
+  // Judul tab browser.
+  useEffect(() => {
+    document.title = 'Reset Password — SiPinjam UNY';
+  }, []);
+
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,7 +73,7 @@ export default function ResetPasswordPage({ onNavigateLogin }: ResetPasswordPage
             </div>
           </div>
           <div className="w-full border-t border-white/20 mt-3 pt-2.5 text-center">
-            <p className="text-[11px] font-semibold text-white/90 tracking-[0.15em] uppercase">Reset Password · SiPinjam</p>
+            <p className="text-[11px] font-semibold text-white/90 tracking-[0.15em] uppercase">Reset Password · SiPinjam UNY</p>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Role } from '../components/Layout';
 import { API_BASE } from '../api/base-url';
 
@@ -9,6 +9,11 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin, onNavigateRegister, onNavigateForgotPassword }: LoginPageProps) {
+  // Judul tab browser.
+  useEffect(() => {
+    document.title = 'Masuk — SiPinjam UNY';
+  }, []);
+
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

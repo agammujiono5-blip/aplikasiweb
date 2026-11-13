@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Role } from '../components/Layout';
 import { API_BASE } from '../api/base-url';
 
@@ -8,6 +8,11 @@ interface AdminLoginPageProps {
 }
 
 export default function AdminLoginPage({ onLogin, onNavigateLogin }: AdminLoginPageProps) {
+  // Judul tab browser.
+  useEffect(() => {
+    document.title = 'Login Admin — SiPinjam UNY';
+  }, []);
+
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

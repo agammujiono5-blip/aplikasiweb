@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 
 interface ForgotPasswordPageProps {
@@ -6,6 +6,11 @@ interface ForgotPasswordPageProps {
 }
 
 export default function ForgotPasswordPage({ onNavigateLogin }: ForgotPasswordPageProps) {
+  // Judul tab browser.
+  useEffect(() => {
+    document.title = 'Lupa Password — SiPinjam UNY';
+  }, []);
+
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -63,7 +68,7 @@ export default function ForgotPasswordPage({ onNavigateLogin }: ForgotPasswordPa
             </div>
           </div>
           <div className="w-full border-t border-white/20 mt-3 pt-2.5 text-center">
-            <p className="text-[11px] font-semibold text-white/90 tracking-[0.15em] uppercase">Lupa Password · SiPinjam</p>
+            <p className="text-[11px] font-semibold text-white/90 tracking-[0.15em] uppercase">Lupa Password · SiPinjam UNY</p>
           </div>
         </div>
 

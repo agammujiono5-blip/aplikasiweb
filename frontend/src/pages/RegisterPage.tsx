@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Role } from '../components/Layout';
 import { API_BASE } from '../api/base-url';
 
@@ -8,6 +8,11 @@ interface RegisterPageProps {
 }
 
 export default function RegisterPage({ onNavigateLogin, onRegisterSuccess }: RegisterPageProps) {
+  // Judul tab browser.
+  useEffect(() => {
+    document.title = 'Daftar Akun — SiPinjam UNY';
+  }, []);
+
   const [name, setName] = useState('');
   const [nim, setNim] = useState('');
   const [email, setEmail] = useState('');
