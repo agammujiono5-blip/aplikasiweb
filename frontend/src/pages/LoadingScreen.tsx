@@ -8,62 +8,38 @@ interface LoadingScreenProps {
 export default function LoadingScreen({ onComplete, isReady = false }: LoadingScreenProps) {
   const [progress, setProgress] = useState(0);
   const [fadeOut, setFadeOut] = useState(false);
+  const completedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
-  const isReadyRef = useRef(isReady);
-  isReadyRef.current = isReady;
+
+  // Finish exactly once, then hand control back to the app as quickly as possible
+  const finish = () => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    setProgress(100);
+    setFadeOut(true);
+    setTimeout(() => onCompleteRef.current(), 120);
+  };
 
   useEffect(() => {
+    if (isReady) {
+      finish();
+      return;
+    }
+
+    // Auth is still validating: advance smoothly up to 90% and wait
     const timer = setInterval(() => {
-      setProgress(prev => {
-        // If auth is already ready, advance quickly towards 100%
-        if (isReadyRef.current) {
-          if (prev >= 100) {
-            clearInterval(timer);
-            setFadeOut(true);
-            setTimeout(() => onCompleteRef.current(), 300);
-            return 100;
-          }
-          return Math.min(100, prev + 10);
-        }
+      setProgress(prev => (prev < 90 ? prev + 12 : prev));
+    }, 25);
 
-        // If auth is still validating, smoothly advance up to 90% and wait
-        if (prev < 90) {
-          return prev + 3;
-        }
-        return 90;
-      });
-    }, 30);
-
-    // Safety timeout: in case network never resolves, force complete after 4 seconds
-    const safetyTimeout = setTimeout(() => {
-      setProgress(100);
-      setFadeOut(true);
-      setTimeout(() => onCompleteRef.current(), 300);
-    }, 4000);
+    // Safety timeout: in case network never resolves, force complete after 2 seconds
+    const safetyTimeout = setTimeout(finish, 2000);
 
     return () => {
       clearInterval(timer);
       clearTimeout(safetyTimeout);
     };
-  }, []);
-
-  // When isReady flips to true from outside, immediately accelerate progress to 100%
-  useEffect(() => {
-    if (isReady && progress < 100) {
-      const fastInterval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(fastInterval);
-            setFadeOut(true);
-            setTimeout(() => onCompleteRef.current(), 300);
-            return 100;
-          }
-          return Math.min(100, prev + 15);
-        });
-      }, 25);
-      return () => clearInterval(fastInterval);
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);
 
   return (
@@ -72,7 +48,7 @@ export default function LoadingScreen({ onComplete, isReady = false }: LoadingSc
       style={{
         fontFamily: "'Plus Jakarta Sans', sans-serif",
         opacity: fadeOut ? 0 : 1,
-        transition: 'opacity 0.5s ease',
+        transition: 'opacity 0.15s ease-out',
       }}
     >
       {/* Background: HD Universitas Negeri Yogyakarta monument photo */}

@@ -78,16 +78,32 @@ export default function AjukanPeminjaman({ onNavigate }: AjukanProps) {
   // Identify booked slots for chosen room and date
   const bookedSlotsOnDate = (allJadwal && form.tanggal && allJadwal[form.tanggal])
     ? allJadwal[form.tanggal].filter(j =>
-        selectedRoom ? j.room.toLowerCase().includes(selectedRoom.name.toLowerCase()) : false
+        selectedRoom
+          ? String(j.room_id) === String(selectedRoom.id)
+          : false
       )
     : [];
 
-  // Detect time overlap
+  // Normalize any time string ("8.00", "08.00 WIB", "08:00:00") into "HH:MM" for reliable comparison
+  const toMinutes = (value: string) => {
+    const match = String(value).match(/(\d{1,2})\s*[:.]\s*(\d{1,2})/);
+    if (!match) return null;
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (hour > 23 || minute > 59) return null;
+    return hour * 60 + minute;
+  };
+
+  // Detect time overlap (half-open intervals: 08:00-12:00 and 12:00-14:00 do NOT overlap)
   const conflictBooking = bookedSlotsOnDate.find(b => {
-    const parts = b.time.split('-').map(s => s.trim().replace(' WIB', ''));
+    const parts = b.time.split(/[–-]/).map(s => s.trim().replace(' WIB', ''));
     if (parts.length === 2) {
-      const [start, end] = parts;
-      return form.jamMulai < end && form.jamSelesai > start;
+      const start = toMinutes(parts[0]);
+      const end = toMinutes(parts[1]);
+      const formStart = toMinutes(form.jamMulai);
+      const formEnd = toMinutes(form.jamSelesai);
+      if (start === null || end === null || formStart === null || formEnd === null) return false;
+      return formStart < end && formEnd > start;
     }
     return false;
   });

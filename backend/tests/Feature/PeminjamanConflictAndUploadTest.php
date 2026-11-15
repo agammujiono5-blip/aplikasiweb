@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Admin;
 use App\Models\Peminjaman;
 use App\Models\Room;
 use App\Models\User;
@@ -17,6 +18,7 @@ class PeminjamanConflictAndUploadTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Room $room;
 
     protected function setUp(): void
@@ -108,6 +110,165 @@ class PeminjamanConflictAndUploadTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonPath('status', 'success');
+    }
+
+    public function test_two_users_cannot_book_the_same_room_slot(): void
+    {
+        $secondUser = User::create([
+            'name' => 'Rani Puspita',
+            'nim' => '2023005678',
+            'email' => 'rani@kampus.ac.id',
+            'password' => Hash::make('Password#123!'),
+            'is_active' => true,
+        ]);
+
+        // User 1 books 16 Oct, 08:00 - 12:00
+        Sanctum::actingAs($this->user, ['user']);
+
+        $this->postJson('/api/user/peminjaman', $this->bookingPayload([
+            'nama_kegiatan' => 'Kuliah Umum User 1',
+        ]))->assertStatus(201);
+
+        // User 2 tries the exact same slot
+        Sanctum::actingAs($secondUser, ['user']);
+
+        $response = $this->postJson('/api/user/peminjaman', $this->bookingPayload([
+            'nama_kegiatan' => 'Kuliah Umum User 2',
+        ]));
+
+        $response->assertStatus(422)->assertJsonPath('status', 'error');
+        $this->assertStringContainsString('bentrok', strtolower($response->json('message')));
+
+        $this->assertSame(1, Peminjaman::where('room_id', $this->room->id)
+            ->whereDate('tanggal', '2026-10-16')
+            ->count());
+    }
+
+    public function test_peminjaman_rejects_overlap_when_times_have_different_formats(): void
+    {
+        Sanctum::actingAs($this->user, ['user']);
+
+        Peminjaman::create([
+            'ticket_number' => '#RNG-2026-0003',
+            'user_id' => $this->user->id,
+            'room_id' => $this->room->id,
+            'nama_kegiatan' => 'Kegiatan Lama',
+            'organisasi' => 'BEM Fasilkom',
+            'tanggal' => '2026-10-16',
+            'jam_mulai' => '8.00',
+            'jam_selesai' => '12.00',
+            'estimasi_peserta' => 50,
+            'status' => 'menunggu',
+        ]);
+
+        $response = $this->postJson('/api/user/peminjaman', $this->bookingPayload([
+            'nama_kegiatan' => 'Kegiatan Baru',
+            'jam_mulai' => '9:30',
+            'jam_selesai' => '11.00 WIB',
+        ]));
+
+        $response->assertStatus(422)->assertJsonPath('status', 'error');
+    }
+
+    public function test_peminjaman_rejects_end_time_before_start_time(): void
+    {
+        Sanctum::actingAs($this->user, ['user']);
+
+        $response = $this->postJson('/api/user/peminjaman', $this->bookingPayload([
+            'nama_kegiatan' => 'Kegiatan Terbalik',
+            'jam_mulai' => '12:00',
+            'jam_selesai' => '08:00',
+        ]));
+
+        $response->assertStatus(422)->assertJsonPath('status', 'error');
+        $this->assertDatabaseCount('peminjaman', 0);
+    }
+
+    public function test_back_to_back_schedule_is_allowed(): void
+    {
+        Sanctum::actingAs($this->user, ['user']);
+
+        Peminjaman::create([
+            'ticket_number' => '#RNG-2026-0004',
+            'user_id' => $this->user->id,
+            'room_id' => $this->room->id,
+            'nama_kegiatan' => 'Kegiatan Pagi',
+            'organisasi' => 'BEM Fasilkom',
+            'tanggal' => '2026-10-16',
+            'jam_mulai' => '08:00',
+            'jam_selesai' => '12:00',
+            'estimasi_peserta' => 50,
+            'status' => 'disetujui',
+        ]);
+
+        $this->postJson('/api/user/peminjaman', $this->bookingPayload([
+            'nama_kegiatan' => 'Kegiatan Siang',
+            'jam_mulai' => '12:00',
+            'jam_selesai' => '16:00',
+        ]))->assertStatus(201);
+    }
+
+    public function test_admin_cannot_approve_overlapping_application(): void
+    {
+        $admin = Admin::create([
+            'petugas_id' => 'SARPRAS-001',
+            'name' => 'Admin Sarpras',
+            'email' => 'admin@kampus.ac.id',
+            'password' => Hash::make('Admin#Secure2024!'),
+            'role' => 'superadmin',
+            'is_active' => true,
+        ]);
+
+        Peminjaman::create([
+            'ticket_number' => '#RNG-2026-0005',
+            'user_id' => $this->user->id,
+            'room_id' => $this->room->id,
+            'nama_kegiatan' => 'Kegiatan Disetujui',
+            'organisasi' => 'BEM Fasilkom',
+            'tanggal' => '2026-10-16',
+            'jam_mulai' => '08:00',
+            'jam_selesai' => '12:00',
+            'estimasi_peserta' => 50,
+            'status' => 'disetujui',
+        ]);
+
+        $pending = Peminjaman::create([
+            'ticket_number' => '#RNG-2026-0006',
+            'user_id' => $this->user->id,
+            'room_id' => $this->room->id,
+            'nama_kegiatan' => 'Kegiatan Menunggu',
+            'organisasi' => 'BEM Fasilkom',
+            'tanggal' => '2026-10-16',
+            'jam_mulai' => '10:00',
+            'jam_selesai' => '14:00',
+            'estimasi_peserta' => 50,
+            'status' => 'menunggu',
+        ]);
+
+        Sanctum::actingAs($admin, ['admin']);
+        $this->patchJson("/api/admin/peminjaman/{$pending->id}/status", ['status' => 'disetujui'])
+            ->assertStatus(422);
+
+        $this->assertSame('menunggu', $pending->fresh()->status);
+    }
+
+    /**
+     * Payload for the duplicate booking scenario (16 Oct 2026, 08:00 - 12:00).
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function bookingPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'nama_kegiatan' => 'Kegiatan Uji',
+            'organisasi' => 'BEM Fasilkom',
+            'room_id' => $this->room->id,
+            'tanggal' => '2026-10-16',
+            'jam_mulai' => '08:00',
+            'jam_selesai' => '12:00',
+            'estimasi_peserta' => 50,
+        ], $overrides);
     }
 
     public function test_peminjaman_supports_pdf_document_upload(): void

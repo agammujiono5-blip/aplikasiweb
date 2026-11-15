@@ -439,7 +439,7 @@ export const api = {
 
   // Jadwal
   jadwal: {
-    async get(roomId?: string | number): Promise<Record<string, { id: string; db_id: number; title: string; room: string; time: string; requester: string; status: string; peserta?: number }[]>> {
+    async get(roomId?: string | number): Promise<Record<string, { id: string; db_id: number; title: string; room: string; room_id: number; time: string; requester: string; status: string; peserta?: number }[]>> {
       const params = new URLSearchParams();
       if (roomId && roomId !== 'all') params.set('room_id', String(roomId));
 
