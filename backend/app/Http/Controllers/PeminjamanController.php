@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use App\Services\N8nService;
 
 class PeminjamanController extends Controller
 {
@@ -51,7 +52,7 @@ class PeminjamanController extends Controller
     /**
      * Submit a new loan application by Penyewa.
      */
-    public function storeUser(Request $request): JsonResponse
+    public function storeUser(Request $request, N8nService $n8n): JsonResponse
     {
         $user = $request->user();
 
@@ -148,6 +149,24 @@ class PeminjamanController extends Controller
         ]);
 
         self::flushPeminjamanCache();
+        // Send new loan application to n8n
+$n8n->sendPeminjaman([
+    'event' => 'peminjaman.created',
+    'ticket_number' => $peminjaman->ticket_number,
+    'nama_kegiatan' => $peminjaman->nama_kegiatan,
+    'organisasi' => $peminjaman->organisasi,
+    'nama_pemohon' => $user->name,
+    'nim' => $user->nim,
+    'email' => $user->email,
+    'ruangan' => $peminjaman->room?->name,
+    'tanggal' => $peminjaman->tanggal,
+    'jam_mulai' => $peminjaman->jam_mulai,
+    'jam_selesai' => $peminjaman->jam_selesai,
+    'estimasi_peserta' => $peminjaman->estimasi_peserta,
+    'status' => $peminjaman->status,
+    'keperluan' => $peminjaman->keperluan,
+    'created_at' => $peminjaman->created_at?->toISOString(),
+]);
 
         return response()->json([
             'status' => 'success',
