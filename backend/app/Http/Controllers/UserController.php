@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Peminjaman;
 use App\Models\User;
+use App\Services\Auth\LoginRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -12,21 +14,30 @@ use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
+    /** Cache daftar pengguna admin (dihapus otomatis saat ada perubahan). */
+    public const USERS_CACHE_KEY = 'admin_users_list';
+
     /**
      * Get all users for DataPengguna (Admin only).
      * High speed cache for zero-delay user table loading.
      */
     public function indexAdmin(): JsonResponse
     {
-        $mapped = Cache::remember('admin_users_list', 120, function () {
-            $users = User::withCount([
-                'peminjamans',
-                'peminjamans as approved_peminjamans_count' => function ($q) {
-                    $q->where('status', 'disetujui');
-                },
-            ])->orderBy('id', 'asc')->get();
+        $mapped = Cache::remember(self::USERS_CACHE_KEY, 600, function () {
+            // Hitung pengajuan & yang disetujui dalam SATU query agregat
+            // (bukan dua subquery per user) agar cache-miss tidak menghukum
+            // database remote dengan banyak round-trip.
+            $counts = Peminjaman::query()
+                ->selectRaw('user_id, count(*) as pengajuan_count, count(case when status = \'disetujui\' then 1 end) as approved_count')
+                ->groupBy('user_id')
+                ->get()
+                ->keyBy('user_id');
 
-            return $users->map(function ($u) {
+            $users = User::orderBy('id', 'asc')->get();
+
+            return $users->map(function ($u) use ($counts) {
+                $row = $counts->get($u->id);
+
                 return [
                     'id' => (string) $u->id,
                     'nama' => $u->name,
@@ -40,8 +51,8 @@ class UserController extends Controller
                     'jabatan' => $u->jabatan ?? '-',
                     'alamat' => $u->alamat ?? '-',
                     'status' => $u->is_active ? 'aktif' : 'nonaktif',
-                    'pengajuan' => $u->peminjamans_count,
-                    'disetujui' => $u->approved_peminjamans_count,
+                    'pengajuan' => (int) ($row->pengajuan_count ?? 0),
+                    'disetujui' => (int) ($row->approved_count ?? 0),
                 ];
             })->values()->all();
         });
@@ -61,7 +72,8 @@ class UserController extends Controller
         $user->is_active = ! $user->is_active;
         $user->save();
 
-        Cache::forget('admin_users_list');
+        Cache::forget(self::USERS_CACHE_KEY);
+        LoginRepository::forgetFor($user);
 
         return response()->json([
             'status' => 'success',
@@ -175,7 +187,13 @@ class UserController extends Controller
             $user->password = Hash::make($validated['password_baru']);
         }
 
+        $oldNim = $user->getOriginal('nim');
+        $oldEmail = $user->getOriginal('email');
+
         $user->save();
+
+        // Email/nim/password berubah → lookup login lama tidak boleh dipakai.
+        LoginRepository::forgetFor($user, array_filter([$oldNim, $oldEmail]));
 
         return response()->json([
             'status' => 'success',

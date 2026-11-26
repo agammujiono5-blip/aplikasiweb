@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\PersonalAccessToken;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 class SlideSession
@@ -16,8 +17,9 @@ class SlideSession
      * lebih dari 10 menit, token kedaluwarsa dan harus login untuk mendapat
      * token (sesi) baru.
      *
-     * Biaya per request dijaga minimal: cache token sudah berisi data terbaru
-     * dan hanya satu UPDATE ringan per request (tanpa query baca tambahan).
+     * Karena DB bisa berada di region lain (~300 ms/query), perpanjangan
+     * ditulis ke DB paling banyak sekali per menit; di antaranya cukup cache
+     * yang diperbarui sehingga tidak ada query tambahan di jalur request.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -38,12 +40,35 @@ class SlideSession
             ], 401);
         }
 
-        $token->touchSession();
+        $expiresAt = now()->addMinutes(PersonalAccessToken::SESSION_MINUTES);
+        $token->extendSession($expiresAt);
+
+        if ($this->needsDatabaseSync($token, $expiresAt)) {
+            $token->saveExpiresAt($expiresAt);
+        }
 
         $response = $next($request);
 
-        $response->headers->set('X-Session-Expires-At', now()->addMinutes(PersonalAccessToken::SESSION_MINUTES)->toIso8601String());
+        $response->headers->set('X-Session-Expires-At', $expiresAt->toIso8601String());
 
         return $response;
+    }
+
+    /**
+     * Tulis ke DB bila nilai di DB sudah tertinggal cukup jauh. Dengan selang
+     * 1 menit, token yang DB-nya tertinggal maksimal 1 menit dari nilai cache
+     * tetap berlaku dan tidak memicu logout palsu.
+     */
+    private function needsDatabaseSync(PersonalAccessToken $token, Carbon $expiresAt): bool
+    {
+        $stored = $token->getOriginal('expires_at');
+
+        if (! $stored) {
+            return true;
+        }
+
+        $storedExpires = Carbon::parse($stored);
+
+        return $storedExpires->lt($expiresAt->copy()->subMinute());
     }
 }

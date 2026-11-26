@@ -84,4 +84,18 @@ return [
         'validate_csrf_token' => ValidateCsrfToken::class,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Track Last Used At
+    |--------------------------------------------------------------------------
+    |
+    | Bila true, Sanctum menulis `last_used_at` pada SETIAP request (~300 ms
+    | bila database berada di region lain). Nilai itu hanya dipakai untuk
+    | pembersihan token, sedangkan aktivitas sesi sudah dicatat oleh
+    | middleware SlideSession lewat `expires_at`. Karena itu dimatikan.
+    |
+    */
+
+    'last_used_at' => env('SANCTUM_TRACK_LAST_USED_AT', false),
+
 ];

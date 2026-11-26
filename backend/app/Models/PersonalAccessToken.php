@@ -38,19 +38,26 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     }
 
     /**
-     * Perpanjang sesi token selama pengguna masih beraktivitas.
-     * Cache ikut diperbarui agar request berikutnya tetap ~1ms tanpa query DB.
+     * Perpanjang sesi di level cache (tanpa query DB). Nilai `expires_at`
+     * asli dari DB dibiarkan apa adanya; lihat saveExpiresAt().
      */
-    public function touchSession(): void
+    public function extendSession(\Illuminate\Support\Carbon $expiresAt): void
     {
-        $expiresAt = now()->addMinutes(static::SESSION_MINUTES);
         $this->setAttribute('expires_at', $expiresAt);
-        $this->syncOriginalAttribute('expires_at');
-
-        // Update DB langsung; hindari save() penuh yang dapat menimpa last_used_at.
-        static::whereKey($this->getKey())->update(['expires_at' => $expiresAt]);
 
         $this->refreshCache($expiresAt);
+    }
+
+    /**
+     * Tulis `expires_at` baru ke DB (tanpa query baca tambahan) dan jadikan
+     * nilai tersebut nilai asli, sehingga perbandingan berikutnya akurat.
+     */
+    public function saveExpiresAt(\Illuminate\Support\Carbon $expiresAt): void
+    {
+        static::whereKey($this->getKey())->update(['expires_at' => $expiresAt]);
+
+        $this->setAttribute('expires_at', $expiresAt);
+        $this->syncOriginalAttribute('expires_at');
     }
 
     /**
@@ -151,8 +158,10 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
      */
     protected static function serializeTokenData($instance): array
     {
+        $attributes = $instance->getAttributes();
+
         return [
-            'attributes' => $instance->getAttributes(),
+            'attributes' => $attributes,
             'tokenable_type' => $instance->tokenable_type,
             'tokenable_attributes' => $instance->tokenable ? $instance->tokenable->getAttributes() : null,
         ];
@@ -178,30 +187,6 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         }
 
         return $instance;
-    }
-
-    /**
-     * Throttle last_used_at timestamp updates to prevent slow remote database writes on every hit.
-     */
-    public function save(array $options = [])
-    {
-        $dirty = $this->getDirty();
-
-        // If only updating last_used_at and it was recently updated within the last 15 minutes, skip DB roundtrip
-        if (count($dirty) === 1 && isset($dirty['last_used_at'])) {
-            $originalLastUsed = $this->getOriginal('last_used_at');
-            if ($originalLastUsed) {
-                $lastUsedTimestamp = is_numeric($originalLastUsed)
-                    ? $originalLastUsed
-                    : strtotime((string) $originalLastUsed);
-
-                if ($lastUsedTimestamp && (time() - $lastUsedTimestamp) < 900) {
-                    return true;
-                }
-            }
-        }
-
-        return parent::save($options);
     }
 
     /**

@@ -56,17 +56,21 @@ class SessionSlideTest extends TestCase
         [$user] = $this->loginUser();
         $token = $user->tokens()->firstOrFail();
 
-        // Waktu menjelang habis; request aktif harus memperpanjang kembali ke 10 menit.
+        // Waktu menjelang habis; request aktif harus memperpanjang kembali.
         $this->travel(9)->minutes();
         $token->forceFill(['expires_at' => now()->addMinute()])->save();
-        // Simulasikan cache hangat (Redis) yang ikut berisi expires_at terbaru.
-        PersonalAccessToken::cacheNewToken($token, $token->fresh(), $user);
+        $token = $token->fresh();
+        PersonalAccessToken::cacheNewToken($this->plainToken, $token, $user);
 
         $this->getJson('/api/user/me', ['Authorization' => "Bearer {$this->plainToken}"])->assertOk();
 
-        $this->assertTrue(
-            $token->fresh()->expires_at->greaterThan(now()->addMinutes(9)),
-        );
+        // DB disinkronkan paling sering sekali per menit, jadi nilai DB
+        // boleh tertinggal sedikit namun tetap memperpanjang sesi.
+        $this->assertTrue($token->fresh()->expires_at->greaterThan(now()->addMinute()));
+
+        // Cache (jalur request) memegang nilai penuh: aktif walau 9 menit lagi.
+        $this->travel(8)->minutes();
+        $this->getJson('/api/user/me', ['Authorization' => "Bearer {$this->plainToken}"])->assertOk();
     }
 
     public function test_sesi_kedaluwarsa_setelah_10_menit_tanpa_aktivitas(): void

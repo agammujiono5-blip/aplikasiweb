@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\AdminLoginRequest;
 use App\Models\Admin;
 use App\Models\PersonalAccessToken;
 use App\Services\Auth\LoginRateLimiter;
+use App\Services\Auth\LoginRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\Hash;
 class AdminAuthController extends Controller
 {
     public function __construct(
-        protected LoginRateLimiter $rateLimiter
+        protected LoginRateLimiter $rateLimiter,
+        protected LoginRepository $lookup,
     ) {}
 
     /**
@@ -39,16 +41,15 @@ class AdminAuthController extends Controller
             ], 429);
         }
 
-        // Eloquent parameterized query on separate admins table prevents SQL Injection
-        $admin = Admin::where('petugas_id', $credential)
-            ->orWhere('email', $credential)
-            ->first();
+        // Eloquent parameterized query on separate admins table prevents SQL Injection.
+        // Lookup diambil dari cache setelah login pertama (DB lambat/remote).
+        [$admin] = $this->lookup->findAdmin($credential);
 
         // Check password against Argon2id/Bcrypt hash
-        if (! $admin || ! Hash::check($password, $admin->password)) {
+        if (! $admin || ! $this->lookup->checkPassword($admin, $password)) {
             // Check if it's a student trying to log in through admin portal
-            $userExists = \App\Models\User::where('email', $credential)->orWhere('nim', $credential)->first();
-            if ($userExists && Hash::check($password, $userExists->password)) {
+            [$userExists] = $this->lookup->findUser($credential);
+            if ($userExists && $this->lookup->checkPassword($userExists, $password)) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Akun ini terdaftar sebagai Mahasiswa/Penyewa. Silakan masuk melalui halaman login Mahasiswa.',
@@ -76,6 +77,10 @@ class AdminAuthController extends Controller
 
         // Login successful: Clear rate limiter
         $this->rateLimiter->clear($credential, $request, 'admin');
+
+        // Password valid → simpan hash terenkripsi + rehash ke algoritma saat ini.
+        $this->lookup->remember($admin, $password);
+        $admin->save();
 
         $tokenInstance = $admin->createSessionToken('admin-token', ['admin']);
         $token = $tokenInstance->plainTextToken;

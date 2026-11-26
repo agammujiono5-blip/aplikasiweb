@@ -28,6 +28,9 @@ class PeminjamanController extends Controller
         $v = (int) Cache::get('peminjaman_v', 1);
         Cache::put('peminjaman_v', $v + 1, 86400 * 30);
         Cache::forget('rooms_list_with_count');
+
+        // Daftar pengguna memuat jumlah pengajuan, jadi harus ikut dihapus.
+        Cache::forget(UserController::USERS_CACHE_KEY);
     }
 
     /**
@@ -739,23 +742,32 @@ class PeminjamanController extends Controller
                     ];
                 });
 
-            // Room usage calculation
-            $rooms = Room::withCount(['peminjamans as approved_bookings' => function ($q) {
-                $q->where('status', 'disetujui');
-            }])->get();
+            // Room usage calculation — satu query agregat untuk semua ruangan
+            // (menghindari subquery count per ruangan pada DB remote).
+            $approvedPerRoom = Peminjaman::query()
+                ->selectRaw('room_id, count(*) as approved_bookings')
+                ->where('status', 'disetujui')
+                ->groupBy('room_id')
+                ->pluck('approved_bookings', 'room_id');
 
-            $maxBookings = max(1, $rooms->max('approved_bookings'));
-            $roomUsage = $rooms->map(function ($r) use ($maxBookings) {
-                $usagePercent = min(100, (int) round(($r->approved_bookings / $maxBookings) * 85 + 15));
-                if ($r->approved_bookings === 0) {
+            // Pakai cache daftar ruangan yang sudah diisi RoomController::index.
+            $rooms = collect(Cache::remember('rooms_list_with_count', 120, function () {
+                return Room::orderBy('id', 'asc')->get(['id', 'name', 'status', 'gedung', 'kapasitas', 'fasilitas', 'created_at', 'updated_at'])->toArray();
+            }));
+
+            $maxBookings = max(1, (int) $approvedPerRoom->max());
+            $roomUsage = $rooms->map(function ($r) use ($maxBookings, $approvedPerRoom) {
+                $bookings = (int) ($approvedPerRoom[$r['id']] ?? 0);
+                $usagePercent = min(100, (int) round(($bookings / $maxBookings) * 85 + 15));
+                if ($bookings === 0) {
                     $usagePercent = 10;
                 }
 
                 return [
-                    'name' => $r->name,
-                    'bookings' => $r->approved_bookings,
+                    'name' => $r['name'],
+                    'bookings' => $bookings,
                     'usage' => $usagePercent,
-                    'status' => $r->status,
+                    'status' => $r['status'],
                 ];
             })->sortByDesc('bookings')->values();
 

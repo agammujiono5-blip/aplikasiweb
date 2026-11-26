@@ -8,6 +8,7 @@ use App\Http\Requests\Auth\UserRegisterRequest;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Services\Auth\LoginRateLimiter;
+use App\Services\Auth\LoginRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -15,7 +16,8 @@ use Illuminate\Support\Facades\Hash;
 class UserAuthController extends Controller
 {
     public function __construct(
-        protected LoginRateLimiter $rateLimiter
+        protected LoginRateLimiter $rateLimiter,
+        protected LoginRepository $lookup,
     ) {}
 
     /**
@@ -35,6 +37,10 @@ class UserAuthController extends Controller
             'password' => Hash::make($validated['password']),
             'is_active' => true,
         ]);
+
+        // Cegah login pertama yang lambat: pengguna yang baru mendaftar
+        // langsung tercatat di cache lookup, jadi tidak perlu SELECT ulang.
+        $this->lookup->remember($user, $validated['password']);
 
         $tokenInstance = $user->createSessionToken('user-token', ['user']);
         $token = $tokenInstance->plainTextToken;
@@ -80,16 +86,15 @@ class UserAuthController extends Controller
             ], 429);
         }
 
-        // Eloquent parameterized query prevents SQL Injection
-        $user = User::where('nim', $credential)
-            ->orWhere('email', $credential)
-            ->first();
+        // Eloquent parameterized query prevents SQL Injection.
+        // Lookup diambil dari cache setelah login pertama (DB lambat/remote).
+        [$user] = $this->lookup->findUser($credential);
 
         // Check password against Argon2id/Bcrypt hash
-        if (! $user || ! Hash::check($password, $user->password)) {
+        if (! $user || ! $this->lookup->checkPassword($user, $password)) {
             // Check if it's an admin credential trying to log in through the student portal
-            $adminExists = \App\Models\Admin::where('email', $credential)->orWhere('petugas_id', $credential)->first();
-            if ($adminExists && Hash::check($password, $adminExists->password)) {
+            [$adminExists] = $this->lookup->findAdmin($credential);
+            if ($adminExists && $this->lookup->checkPassword($adminExists, $password)) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Akun ini terdaftar sebagai Administrator / Petugas Sarpras. Silakan masuk melalui halaman login Admin.',
@@ -117,6 +122,10 @@ class UserAuthController extends Controller
 
         // Login successful: Clear rate limiter
         $this->rateLimiter->clear($credential, $request, 'user');
+
+        // Password valid → aman menyimpan hash terenkripsi + rehash bila perlu.
+        $this->lookup->remember($user, $password);
+        $user->save();
 
         $tokenInstance = $user->createSessionToken('user-token', ['user']);
         $token = $tokenInstance->plainTextToken;
