@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\NewAccessToken;
 
 class User extends Authenticatable
 {
@@ -55,6 +56,15 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Buat token sesi dengan masa berlaku 10 menit (sliding, diperpanjang
+     * oleh middleware SlideSession selama pengguna aktif).
+     */
+    public function createSessionToken(string $name, array $abilities = []): NewAccessToken
+    {
+        return $this->createToken($name, $abilities, now()->addMinutes(PersonalAccessToken::SESSION_MINUTES));
     }
 
     public function peminjamans(): HasMany

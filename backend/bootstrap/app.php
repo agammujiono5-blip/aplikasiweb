@@ -43,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.admin' => \App\Http\Middleware\EnsureAdmin::class,
             'auth.user' => \App\Http\Middleware\EnsureUser::class,
+            'session.slide' => \App\Http\Middleware\SlideSession::class,
         ]);
 
         /*

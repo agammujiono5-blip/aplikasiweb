@@ -657,13 +657,14 @@ export const api = {
 
 /**
  * Custom React Hook for Realtime Live Querying.
- * Polls at intervalMs (default 15000ms), listens to cross-tab & in-window broadcasts, and refreshes on tab focus.
+ * Polls at intervalMs (default 30000ms), listens to cross-tab & in-window broadcasts, and refreshes on tab focus.
+ * Interval dilonggarkan agar kuota backend tidak terkuras (UI tetap instan via cache + event).
  * Protected against request flooding via inFlightRef and tab visibility check.
  */
 export function useLiveQuery<T>(
   queryFn: () => Promise<T>,
   deps: unknown[] = [],
-  intervalMs = 15000
+  intervalMs = 30000
 ): { data: T | null; loading: boolean; error: Error | null; refetch: () => Promise<void> } {
   // Generate a deterministic cache key based on queryFn signature and dependencies
   const cacheKey = useRef<string>('');

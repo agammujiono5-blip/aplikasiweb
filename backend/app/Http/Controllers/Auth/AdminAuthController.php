@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\AdminLoginRequest;
 use App\Models\Admin;
+use App\Models\PersonalAccessToken;
 use App\Services\Auth\LoginRateLimiter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -76,14 +77,18 @@ class AdminAuthController extends Controller
         // Login successful: Clear rate limiter
         $this->rateLimiter->clear($credential, $request, 'admin');
 
-        $tokenInstance = $admin->createToken('admin-token', ['admin']);
+        $tokenInstance = $admin->createSessionToken('admin-token', ['admin']);
         $token = $tokenInstance->plainTextToken;
-        \App\Models\PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $admin);
+        PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $admin);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Login admin berhasil. Selamat bertugas!',
             'token' => $token,
+            'session' => [
+                'expires_in' => PersonalAccessToken::SESSION_MINUTES * 60,
+                'expires_at' => now()->addMinutes(PersonalAccessToken::SESSION_MINUTES)->toIso8601String(),
+            ],
             'role' => 'admin',
             'user' => [
                 'id' => $admin->id,

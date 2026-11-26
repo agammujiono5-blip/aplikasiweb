@@ -25,7 +25,7 @@ Route::get('/rooms', [RoomController::class, 'index'])->name('api.rooms.index');
 Route::get('/jadwal', [PeminjamanController::class, 'getJadwal'])->name('api.jadwal.index');
 
 // Penyewa / Mahasiswa Protected Routes
-Route::middleware(['auth:sanctum', 'auth.user'])->prefix('user')->group(function () {
+Route::middleware(['auth:sanctum', 'session.slide', 'auth.user'])->prefix('user')->group(function () {
     Route::get('/me', [UserAuthController::class, 'me'])->name('api.user.me');
     Route::post('/logout', [UserAuthController::class, 'logout'])->name('api.user.logout');
 
@@ -48,7 +48,7 @@ Route::middleware(['auth:sanctum', 'auth.user'])->prefix('user')->group(function
 });
 
 // Admin Protected Routes
-Route::middleware(['auth:sanctum', 'auth.admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'session.slide', 'auth.admin'])->prefix('admin')->group(function () {
     Route::get('/me', [AdminAuthController::class, 'me'])->name('api.admin.me');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('api.admin.logout');
 

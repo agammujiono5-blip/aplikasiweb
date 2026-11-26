@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { API_BASE } from './api/base-url';
+import { clearClientCache } from './api/client';
 import LoadingScreen from './pages/LoadingScreen';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
@@ -25,6 +26,14 @@ import DataPengguna from './pages/admin/DataPengguna';
 import LogAktivitas from './pages/admin/LogAktivitas';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { openBackendErrorPage } from './utils/error-page';
+import {
+  SESSION_TIMEOUT_SECONDS,
+  SESSION_TICK_MS,
+  getLastActivity,
+  markActivity,
+  clearActivity,
+  installActivityListeners,
+} from './utils/session';
 
 type Screen = 'loading' | 'login' | 'admin-login' | 'register' | 'forgot-password' | 'reset-password' | 'app';
 
@@ -69,6 +78,50 @@ function getRouteInfo(path: string): { screen: Screen; role: Role; page: ActiveP
   else if (path.includes('/jadwal')) page = 'jadwal';
   else if (path.includes('/profil')) page = 'profil';
   return { screen: 'app', role: 'penyewa', page };
+}
+
+/**
+ * Akhiri sesi klien: (opsional) cabut token di backend, lalu bersihkan
+ * localStorage & cache query milik role terkait.
+ */
+async function endSession(currentRole: Role, opts: { notifyBackend: boolean }): Promise<void> {
+  const token = currentRole === 'admin'
+    ? (localStorage.getItem('admin_auth_token') || localStorage.getItem('auth_token'))
+    : (localStorage.getItem('user_auth_token') || localStorage.getItem('auth_token'));
+
+  if (opts.notifyBackend && token) {
+    try {
+      const endpoint = currentRole === 'admin'
+        ? `${API_BASE}/admin/logout`
+        : `${API_BASE}/user/logout`;
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+      });
+    } catch (err) {
+      console.error('Logout request failed:', err);
+    }
+  }
+
+  if (currentRole === 'admin') {
+    localStorage.removeItem('admin_auth_token');
+    localStorage.removeItem('admin_user_data');
+    if (localStorage.getItem('user_role') === 'admin') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_role');
+      localStorage.removeItem('user_data');
+    }
+  } else {
+    localStorage.removeItem('user_auth_token');
+    if (localStorage.getItem('user_role') === 'penyewa') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_role');
+      localStorage.removeItem('user_data');
+    }
+  }
+
+  clearActivity();
+  clearClientCache();
 }
 
 export default function App() {
@@ -186,6 +239,40 @@ export default function App() {
     }
   }, []);
 
+  /**
+   * Watchdog sesi: setiap 0,5 detik cek apakah pengguna sudah diam lebih dari
+   * 10 menit. Jika ya, akhiri sesi dan arahkan ke halaman login agar pengguna
+   * login ulang untuk mendapatkan token/sesi baru.
+   */
+  useEffect(() => {
+    if (screen !== 'app') return;
+
+    // Jangan reset ke "baru aktif" bila sesudah refresh sudah melewati batas;
+    // watchdog di bawah langsung mengakhiri sesi pada tick pertama.
+    if (!sessionStorage.getItem('session_watchdog_init')) {
+      sessionStorage.setItem('session_watchdog_init', '1');
+      markActivity(true);
+    }
+    const uninstall = installActivityListeners(() => markActivity());
+
+    const timer = window.setInterval(() => {
+      const idleSeconds = (Date.now() - getLastActivity()) / 1000;
+      if (idleSeconds < SESSION_TIMEOUT_SECONDS) return;
+
+      window.clearInterval(timer);
+      const expiredRole = role;
+      endSession(expiredRole, { notifyBackend: false }).finally(() => {
+        navigateTo(expiredRole === 'admin' ? '/admin/login' : '/login', expiredRole === 'admin' ? 'admin-login' : 'login');
+      });
+    }, SESSION_TICK_MS);
+
+    return () => {
+      window.clearInterval(timer);
+      uninstall();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, role]);
+
   // Browser back/forward navigation
   useEffect(() => {
     const handlePopState = () => {
@@ -223,6 +310,8 @@ export default function App() {
   }, []);
 
   const handleLogin = (r: Role) => {
+    // Sesi baru: mulai hitungan 10 menit aktivitas dari sekarang.
+    markActivity(true);
     setRole(r);
     setActivePage('beranda');
     const path = r === 'admin' ? '/admin/dashboard' : '/dashboard';
@@ -231,40 +320,11 @@ export default function App() {
 
   const handleLogout = async () => {
     const currentRole = role;
-    const token = currentRole === 'admin'
-      ? (localStorage.getItem('admin_auth_token') || localStorage.getItem('auth_token'))
-      : (localStorage.getItem('user_auth_token') || localStorage.getItem('auth_token'));
-
-    if (token) {
-      try {
-        const endpoint = currentRole === 'admin'
-          ? `${API_BASE}/admin/logout`
-          : `${API_BASE}/user/logout`;
-        await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-        });
-      } catch (err) {
-        console.error('Logout request failed:', err);
-      }
-    }
+    await endSession(currentRole, { notifyBackend: true });
 
     if (currentRole === 'admin') {
-      localStorage.removeItem('admin_auth_token');
-      localStorage.removeItem('admin_user_data');
-      if (localStorage.getItem('user_role') === 'admin') {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('user_data');
-      }
       navigateTo('/admin/login', 'admin-login');
     } else {
-      localStorage.removeItem('user_auth_token');
-      if (localStorage.getItem('user_role') === 'penyewa') {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('user_data');
-      }
       navigateTo('/login', 'login');
     }
   };

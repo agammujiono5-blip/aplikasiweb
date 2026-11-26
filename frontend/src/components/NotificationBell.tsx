@@ -63,7 +63,7 @@ export default function NotificationBell() {
     const iv = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchCount();
-    }, 20_000);
+    }, 30_000);
     const handler = () => fetchCount();
     window.addEventListener('sipinjam:realtime-update', handler);
     return () => { clearInterval(iv); window.removeEventListener('sipinjam:realtime-update', handler); };

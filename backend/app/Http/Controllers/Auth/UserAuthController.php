@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\UserLoginRequest;
 use App\Http\Requests\Auth\UserRegisterRequest;
+use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Services\Auth\LoginRateLimiter;
 use Illuminate\Http\JsonResponse;
@@ -35,14 +36,18 @@ class UserAuthController extends Controller
             'is_active' => true,
         ]);
 
-        $tokenInstance = $user->createToken('user-token', ['user']);
+        $tokenInstance = $user->createSessionToken('user-token', ['user']);
         $token = $tokenInstance->plainTextToken;
-        \App\Models\PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $user);
+        PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $user);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Pendaftaran akun berhasil!',
             'token' => $token,
+            'session' => [
+                'expires_in' => PersonalAccessToken::SESSION_MINUTES * 60,
+                'expires_at' => now()->addMinutes(PersonalAccessToken::SESSION_MINUTES)->toIso8601String(),
+            ],
             'role' => 'penyewa',
             'user' => [
                 'id' => $user->id,
@@ -113,14 +118,18 @@ class UserAuthController extends Controller
         // Login successful: Clear rate limiter
         $this->rateLimiter->clear($credential, $request, 'user');
 
-        $tokenInstance = $user->createToken('user-token', ['user']);
+        $tokenInstance = $user->createSessionToken('user-token', ['user']);
         $token = $tokenInstance->plainTextToken;
-        \App\Models\PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $user);
+        PersonalAccessToken::cacheNewToken($token, $tokenInstance->accessToken, $user);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Login berhasil. Selamat datang di SiPinjam Kampus!',
             'token' => $token,
+            'session' => [
+                'expires_in' => PersonalAccessToken::SESSION_MINUTES * 60,
+                'expires_at' => now()->addMinutes(PersonalAccessToken::SESSION_MINUTES)->toIso8601String(),
+            ],
             'role' => 'penyewa',
             'user' => [
                 'id' => $user->id,
@@ -148,6 +157,9 @@ class UserAuthController extends Controller
         return response()->json([
             'status' => 'success',
             'role' => 'penyewa',
+            'session' => [
+                'expires_in' => PersonalAccessToken::SESSION_MINUTES * 60,
+            ],
             'user' => [
                 'id' => $u->id,
                 'name' => $u->name,

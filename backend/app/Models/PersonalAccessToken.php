@@ -8,6 +8,52 @@ use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
     /**
+     * Lama sesi (menit) tanpa aktivitas sebelum token dianggap kedaluwarsa.
+     * Selama pengguna aktif, masa berlaku diperpanjang otomatis (sliding session).
+     */
+    public const SESSION_MINUTES = 10;
+
+    /**
+     * Cek apakah sesi token sudah kedaluwarsa karena tidak aktif.
+     * Berbasis `expires_at` (diperpanjang setiap request) dengan fallback ke
+     * `created_at` untuk token lama yang belum pernah disentuh.
+     */
+    public function isSessionExpired(): bool
+    {
+        $expiresAt = $this->getAttribute('expires_at');
+
+        if ($expiresAt) {
+            return \Illuminate\Support\Carbon::parse($expiresAt)->isPast();
+        }
+
+        $createdAt = $this->getAttribute('created_at');
+
+        if ($createdAt) {
+            return \Illuminate\Support\Carbon::parse($createdAt)
+                ->addMinutes(static::SESSION_MINUTES)
+                ->isPast();
+        }
+
+        return false;
+    }
+
+    /**
+     * Perpanjang sesi token selama pengguna masih beraktivitas.
+     * Cache ikut diperbarui agar request berikutnya tetap ~1ms tanpa query DB.
+     */
+    public function touchSession(): void
+    {
+        $expiresAt = now()->addMinutes(static::SESSION_MINUTES);
+        $this->setAttribute('expires_at', $expiresAt);
+        $this->syncOriginalAttribute('expires_at');
+
+        // Update DB langsung; hindari save() penuh yang dapat menimpa last_used_at.
+        static::whereKey($this->getKey())->update(['expires_at' => $expiresAt]);
+
+        $this->refreshCache($expiresAt);
+    }
+
+    /**
      * Find the token instance matching the given token with safe, high-speed scalar array caching.
      * Prevents __PHP_Incomplete_Class serialization bugs while dropping latency from 1,400ms to ~1ms.
      *
@@ -20,7 +66,16 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
 
         $cachedData = Cache::get($cacheKey);
         if (is_array($cachedData)) {
-            return static::hydrateCachedToken($cachedData);
+            $instance = static::hydrateCachedToken($cachedData);
+
+            // Sesi kedaluwarsa: hapus token + cache agar harus login ulang.
+            if ($instance->isSessionExpired()) {
+                $instance->delete();
+
+                return null;
+            }
+
+            return $instance;
         }
 
         $instance = null;
@@ -36,9 +91,17 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
             }
         }
 
-        if ($instance) {
-            Cache::put($cacheKey, static::serializeTokenData($instance), 600);
+        if (! $instance) {
+            return null;
         }
+
+        if ($instance->isSessionExpired()) {
+            $instance->delete();
+
+            return null;
+        }
+
+        Cache::put($cacheKey, static::serializeTokenData($instance), static::SESSION_MINUTES * 60);
 
         return $instance;
     }
@@ -50,7 +113,37 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     {
         $accessToken->setRelation('tokenable', $tokenable);
         $cacheKey = 'pat_arr_' . hash('sha256', $plainToken);
-        Cache::put($cacheKey, static::serializeTokenData($accessToken), 600);
+        Cache::put($cacheKey, static::serializeTokenData($accessToken), static::SESSION_MINUTES * 60);
+    }
+
+    /**
+     * Segarkan payload cache (tanpa DB) setelah sesi diperpanjang.
+     */
+    protected function refreshCache($expiresAt): void
+    {
+        $plainToken = request()->bearerToken();
+
+        if (! $plainToken || ! str_contains($plainToken, '|')) {
+            return;
+        }
+
+        [, $secret] = explode('|', $plainToken, 2);
+
+        if (! hash_equals($this->getAttribute('token'), hash('sha256', $secret))) {
+            return;
+        }
+
+        $expiresAt = \Illuminate\Support\Carbon::parse($expiresAt);
+
+        Cache::put('pat_arr_' . hash('sha256', $plainToken), [
+            'attributes' => array_merge($this->getAttributes(), [
+                'expires_at' => $expiresAt->format('Y-m-d H:i:s'),
+            ]),
+            'tokenable_type' => $this->tokenable_type,
+            'tokenable_attributes' => $this->relationLoaded('tokenable') && $this->tokenable
+                ? $this->tokenable->getAttributes()
+                : null,
+        ], static::SESSION_MINUTES * 60);
     }
 
     /**
